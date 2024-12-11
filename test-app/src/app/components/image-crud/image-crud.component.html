@@ -1,0 +1,64 @@
+<section>
+    <div class="container my-5">
+        <div class="row my-3">
+            <div class="col-12">
+                <h1 class="text-center">Upload Or Delete Your Images!</h1>
+            </div>
+        </div>
+        <div class="row g-5">
+            <!-- Upload Image Form -->
+            <div class="col-12 col-lg-6">
+                <div class="border p-5">
+                    <h5 class="mb-5">Upload Image</h5>
+                    <form (ngSubmit)="onUploadImage()" class="d-flex flex-column gap-3 justify-content-center align-items-start">
+                        <!-- Image Category -->
+                        <div class="form-group">
+                            <label for="image-category">Image Category</label>
+                            <select [(ngModel)]="imageCategory" name="category" id="image-category" class="form-control" required>
+                                <option value="aGrass">aGrass</option>
+                                <option value="bField">bField</option>
+                                <option value="cIndustry">cIndustry</option>
+                                <option value="dRiverLake">dRiverLake</option>
+                                <option value="eForest">eForest</option>
+                                <option value="fResident">fResident</option>
+                                <option value="gParking">gParking</option>
+                            </select>
+                        </div>
+
+                        <!-- Image File Upload -->
+                        <div class="form-group">
+                            <label for="image-file">Select Images</label>
+                            <input
+                                type="file"
+                                id="image-file"
+                                class="form-control"
+                                accept="image/*"
+                                (change)="onFileChange($event)"
+                                multiple
+                                required
+                            >
+                        </div>
+
+                        <button type="submit" class="btn btn-primary mt-3">Upload</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Delete Image Form -->
+            <div class="col-12 col-lg-6">
+                <div class="border p-5">
+                    <h5 class="mb-5">Delete Image</h5>
+                    <form (ngSubmit)="onDeleteImage()" class="d-flex flex-column gap-3 justify-content-center align-items-start">
+                        <!-- Image Name -->
+                        <div class="form-group">
+                            <label for="image-name-delete">Image Name</label>
+                            <input type="text" [(ngModel)]="deleteImageName" name="deleteImageName" class="form-control" placeholder="Image Name" id="image-name-delete" required>
+                        </div>
+
+                        <button type="submit" class="btn btn-danger mt-3">Delete</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
