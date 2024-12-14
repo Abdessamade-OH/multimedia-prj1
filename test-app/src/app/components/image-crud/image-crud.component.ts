@@ -1,81 +1,67 @@
 import { Component } from '@angular/core';
 import { ImageServiceService } from '../../shared/services/image-service.service';
 import { ReactiveFormsModule,FormsModule } from '@angular/forms';
+import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-image-crud',
   standalone: true,
-  imports: [ReactiveFormsModule,FormsModule],
+  imports: [ReactiveFormsModule,FormsModule, CommonModule],
   templateUrl: './image-crud.component.html',
   styleUrl: './image-crud.component.css'
 })
 export class ImageCrudComponent {
-  imageCategory: string = ''; // Store selected category
-  imageFiles: File[] = []; // Store selected image files
-  deleteImageName: string = ''; // Store the image name for deletion
-  errorMessage: string = ''; // Error message for duplicate names or other issues
 
   constructor(private imageService: ImageServiceService) {}
 
-  // Handle file input changes
-  onFileChange(event: any): void {
-    const files = event.target.files;
-    if (files.length > 0) {
-      this.imageFiles = Array.from(files); // Convert FileList to an array
-    } else {
-      this.imageFiles = [];
+  imageCategory: string = '';
+  selectedFiles: File[] = [];
+  imagePreview: string | null = null;
+  multipleFilesSelected: boolean = false;
+
+  onFileChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+
+    if (input.files) {
+      this.selectedFiles = Array.from(input.files);
+
+      // Check if there's a single file or multiple files
+      if (this.selectedFiles.length === 1) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          this.imagePreview = reader.result as string;
+        };
+        reader.readAsDataURL(this.selectedFiles[0]);
+        this.multipleFilesSelected = false;
+      } else if (this.selectedFiles.length > 1) {
+        this.imagePreview = null; // Clear single preview if multiple files are selected
+        this.multipleFilesSelected = true;
+      }
     }
   }
 
   onUploadImage(): void {
-    if (this.imageCategory && this.imageFiles.length > 0) {
-      const formData = new FormData();
-      this.imageFiles.forEach(file => formData.append('images', file)); // Append all files
-      formData.append('category', this.imageCategory); // Append category
-  
-      this.imageService.uploadImage(formData).subscribe(
-        (response) => {
-          console.log('Images uploaded successfully:', response);
-          alert('Upload successful!');
-          this.resetForm();
-        },
-        (error) => {
-          console.error('Error uploading images:', error);
-          const errorMessage = error.error?.error || 'An unexpected error occurred. Please try again.';
-          alert(errorMessage);
-        }
-      );
-    } else {
-      alert('Please select a category and at least one image.');
-    }
-  }
-  
-  // Delete image by name
-  onDeleteImage(): void {
-    if (this.deleteImageName) {
-      this.imageService.deleteImage(this.deleteImageName).subscribe(
-        (response) => {
-          console.log('Image deleted successfully:', response);
-          alert('Image deleted successfully!');
-        },
-        (error) => {
-          console.error('Error deleting image:', error);
-          alert('Error deleting image. Please try again.');
-        }
-      );
-    } else {
-      alert('Please provide the name of the image to delete.');
-    }
+    const formData = new FormData();
+    this.selectedFiles.forEach(file => {
+      formData.append('images', file);
+    });
+    formData.append('category', this.imageCategory);
+
+    // Call your service to upload the image
+    this.imageService.uploadImage(formData).subscribe({
+      next: (response) => {
+        console.log('Upload successful:', response);
+        this.resetForm();
+      },
+      error: (err) => console.error('Error uploading images:', err)
+    });
   }
 
-  // Reset form after successful upload
-  private resetForm(): void {
-    this.imageFiles = [];
-    const fileInput = document.getElementById('image-file') as HTMLInputElement;
-    if (fileInput) {
-      fileInput.value = ''; // Reset the file input
-    }
-    this.imageCategory = ''; // Reset category selection
+  resetForm(): void {
+    this.imageCategory = '';
+    this.selectedFiles = [];
+    this.imagePreview = null;
+    this.multipleFilesSelected = false;
   }
   
 }
