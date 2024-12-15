@@ -28,14 +28,18 @@ export class ImageTransformService {
     return resizedImage.toDataURL();
   }
 
-  // Crop the image (x, y, width, height)
   async cropImage(imageBase64: string, x: number, y: number, width: number, height: number) {
-    const image = await ImageJs.load(imageBase64);
+  const image = await ImageJs.load(imageBase64);
 
-    const croppedImage = image.crop({ x, y, width, height });
-
-    return croppedImage.toDataURL();
+  // Ensure the crop dimensions are within the image bounds
+  if (x + width > image.width || y + height > image.height) {
+    throw new Error('Crop dimensions exceed image bounds');
   }
+
+  const croppedImage = image.crop({x, y, width, height});
+  return croppedImage.toDataURL();
+}
+
 
   // Convert the image to grayscale
   async grayscaleImage(imageBase64: string) {
@@ -45,4 +49,10 @@ export class ImageTransformService {
 
     return grayscaleImage.toDataURL();
   }
+
+  async getImageDimensions(imageBase64: string) {
+  const image = await ImageJs.load(imageBase64);
+  return { width: image.width, height: image.height };
+}
+
 }
