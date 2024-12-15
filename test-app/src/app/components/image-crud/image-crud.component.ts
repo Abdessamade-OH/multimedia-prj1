@@ -1,25 +1,27 @@
 import { Component } from '@angular/core';
 import { ImageServiceService } from '../../shared/services/image-service.service';
-import { ReactiveFormsModule,FormsModule } from '@angular/forms';
+import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-image-crud',
   standalone: true,
-  imports: [ReactiveFormsModule,FormsModule, CommonModule],
+  imports: [ReactiveFormsModule, FormsModule, CommonModule],
   templateUrl: './image-crud.component.html',
-  styleUrl: './image-crud.component.css'
+  styleUrls: ['./image-crud.component.css']
 })
 export class ImageCrudComponent {
 
-  constructor(private imageService: ImageServiceService) {}
-
-  imageCategory: string = '';
+  imageCategory: string = 'aGrass'; // Default category
   selectedFiles: File[] = [];
   imagePreview: string | null = null;
   multipleFilesSelected: boolean = false;
 
-  onFileChange(event: Event): void {
+  constructor(private imageService: ImageServiceService) {}
+
+  onFileChange(event: any) {
+    this.selectedFiles = event.target.files;
+
     const input = event.target as HTMLInputElement;
 
     if (input.files) {
@@ -40,21 +42,34 @@ export class ImageCrudComponent {
     }
   }
 
-  onUploadImage(): void {
+  onUploadImage() {
+    // Create FormData
     const formData = new FormData();
-    this.selectedFiles.forEach(file => {
-      formData.append('images', file);
-    });
+
+    // Append category first
     formData.append('category', this.imageCategory);
 
-    // Call your service to upload the image
+    // Append all selected files
+    for (let i = 0; i < this.selectedFiles.length; i++) {
+      formData.append('images', this.selectedFiles[i]);
+    }
+
+    // Call service method to upload
     this.imageService.uploadImage(formData).subscribe({
       next: (response) => {
-        console.log('Upload successful:', response);
-        this.resetForm();
+        console.log('Upload successful', response);
+        // Handle success
       },
-      error: (err) => console.error('Error uploading images:', err)
+      error: (error) => {
+        console.error('Upload failed', error);
+        // Handle error
+      }
     });
+  }
+
+  onTransformImage() {
+    // Placeholder for future image transformation logic
+    console.log("Transforming image...");
   }
 
   resetForm(): void {
@@ -63,5 +78,4 @@ export class ImageCrudComponent {
     this.imagePreview = null;
     this.multipleFilesSelected = false;
   }
-  
 }
