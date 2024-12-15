@@ -69,4 +69,27 @@ export class ImageViewComponent implements OnInit {
   }
   
   
+  getImageById(imageId: string): void {
+    console.log('Fetching image with ID:', imageId); // Log the ID to verify it's correct
+    this.imageService.getImageById(imageId).subscribe({
+      next: (imageInfo) => {
+        console.log('Image fetched:', imageInfo); // Log the fetched image data
+        if (imageInfo && imageInfo.path) {
+          const imagePath = imageInfo.path;
+          const relativePath = imagePath.split('/src/upload_folder/')[1];
+          const imageUrl = `http://localhost:3000/uploaded_images/${relativePath}`;
+          window.open(imageUrl, '_blank');
+          console.log('Image opened:', imageUrl);
+        } else {
+          console.log('No image found');
+        }
+      },
+      error: (err) => {
+        console.error('Error fetching image by ID:', err);
+      }
+    });
+  }
+  
+  
+  
 }

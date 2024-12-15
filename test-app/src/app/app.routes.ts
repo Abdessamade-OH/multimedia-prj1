@@ -10,6 +10,7 @@ import { ImageViewComponent } from './components/image-view/image-view.component
 import { SimpleChange } from '@angular/core';
 import { SimpleSearchComponent } from './components/simple-search/simple-search.component';
 import { AdvancedSearchComponent } from './components/advanced-search/advanced-search.component';
+import { HomeComponent } from './components/home/home.component';
 
 export const routes: Routes = [
     {
@@ -23,5 +24,6 @@ export const routes: Routes = [
     { path: 'image-view', component: ImageViewComponent},
     { path: 'simple-search', component: SimpleSearchComponent},
     { path: 'advanced-search', component: AdvancedSearchComponent},
+    { path: 'home', component: HomeComponent}
 
 ];

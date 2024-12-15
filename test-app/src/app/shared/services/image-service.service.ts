@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 @Injectable({
@@ -10,6 +10,8 @@ export class ImageServiceService {
   constructor(private http: HttpClient) { }
 
   private apiUrl = 'http://localhost:3000/api/images'; // Your backend API URL
+  private baseUrl = 'http://localhost:5000'; // Flask API URL
+
 
   // Upload images method using FormData
   uploadImage(formData: FormData): Observable<any> {
@@ -51,5 +53,25 @@ export class ImageServiceService {
   getImagesByCategory(category: string): Observable<any> {
     return this.http.get(`${this.apiUrl}/category/${category}`);
   }
+
+  getImageById(imageId: string): Observable<any> {
+    return this.http.get<any>(`http://localhost:3000/get_image/${imageId}`);
+  }
+  
+  
+
+
+  // POST method for feature extraction
+extractFeatures(imageName: string, category: string, k: number): Observable<any> {
+  // Create a FormData object to append the category and k parameters
+  const formData = new FormData();
+  formData.append('category', category);  // Add category to form data
+  formData.append('k', k.toString());  // Add k to form data, ensure it's a string
+
+  // Perform the POST request with FormData as the body
+  return this.http.post(`${this.baseUrl}/extract_features/${imageName}`, formData);
+}
+
+  
 
 }

@@ -44,9 +44,8 @@
                         <!-- Display the actual image name here -->
                         <h6 class="card-title">{{ image.name }}</h6> <!-- Dynamically display the image name -->
                         <div class="d-flex justify-content-center gap-2 align-items-center flex-wrap">
-                          <button class="btn btn-primary btn-sm">Download</button>
+                          <button class="btn btn-primary btn-sm" (click)="getImageById(image._id)" >Download</button>
                           <button class="btn btn-danger btn-sm" (click)="deleteImage(image._id)">Remove</button>
-                          <button class="btn btn-warning btn-sm">Modify</button>
                         </div>
                       </div>
                     </div>

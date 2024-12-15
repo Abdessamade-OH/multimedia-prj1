@@ -9,17 +9,9 @@ import pickle
 from flask import url_for
 from flask_swagger_ui import get_swaggerui_blueprint
 from feature_extractor import ImageFeatureExtractor
-from flask import Flask, request, jsonify
-from flask_cors import CORS  # Import CORS
-
-
-
 
 app = Flask(__name__)
 api = Api(app)
-
-# Enable CORS for all routes
-CORS(app)
 
 # Configure folders
 UPLOAD_FOLDER = 'upload_folder'
