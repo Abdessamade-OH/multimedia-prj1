@@ -42,7 +42,7 @@
   
               <!-- Image Preview (for single file) -->
               <div class="form-group w-100" *ngIf="imagePreview">
-                <h6 class="mt-3">Preview:</h6>
+                <h6 class="mt-3">Preview Image</h6>
                 <img [src]="imagePreview" alt="Image Preview" class="img-fluid rounded border mt-2" style="max-height: 300px;">
               </div>
   
@@ -59,6 +59,61 @@
   
             <!-- Transform Image Button -->
             <button *ngIf="imagePreview" class="btn btn-secondary mt-3" (click)="onTransformImage()">Transform Image</button>
+  
+            <!-- Transformation Controls (only shows after clicking "Transform Image") -->
+            <div *ngIf="transforming" class="mt-5">
+              <h6>Transform Image</h6>
+  
+              <!-- Rotation Input with Increment/Decrement Buttons -->
+<div class="form-group">
+    <label for="rotation">Rotation (degrees)</label>
+    <div class="d-flex">
+      <input type="number" id="rotation" [(ngModel)]="rotation" (input)="applyTransformations()" class="form-control" style="width: 80px;">
+      <button type="button" class="btn btn-light ml-2" (click)="adjustRotation(5)">+5°</button>
+      <button type="button" class="btn btn-light ml-2" (click)="adjustRotation(-5)">-5°</button>
+    </div>
+  </div>
+  
+  <!-- Resize Input with Increment/Decrement Buttons -->
+  <div class="form-group">
+    <label for="resize">Resize (percentage)</label>
+    <div class="d-flex">
+      <input type="number" id="resize" [(ngModel)]="resize" (input)="applyTransformations()" class="form-control" style="width: 80px;">
+      <button type="button" class="btn btn-light ml-2" (click)="adjustResize(5)">+5%</button>
+      <button type="button" class="btn btn-light ml-2" (click)="adjustResize(-5)">-5%</button>
+    </div>
+  </div>
+  
+  <!-- Crop Input with Increment/Decrement Buttons -->
+  <div class="form-group">
+    <label for="crop">Crop Size (percentage)</label>
+    <div class="d-flex">
+      <input type="number" id="crop" [(ngModel)]="crop" (input)="applyTransformations()" class="form-control" style="width: 80px;">
+      <button type="button" class="btn btn-light ml-2" (click)="adjustCrop(5)">+5%</button>
+      <button type="button" class="btn btn-light ml-2" (click)="adjustCrop(-5)">-5%</button>
+    </div>
+  </div>
+  
+  
+              <!-- Grayscale Toggle -->
+              <div class="form-group">
+                <label for="grayscale">Grayscale</label>
+                <input type="checkbox" id="grayscale" [(ngModel)]="grayscale" (change)="applyTransformations()" class="form-control">
+              </div>
+  
+              <!-- Transformed Image -->
+              <div class="form-group w-100">
+                <h6 class="mt-3">Transformed Image</h6>
+                <img [src]="transformedImage" alt="Transformed Image" class="img-fluid rounded border mt-2" style="max-height: 300px;">
+              </div>
+  
+              <!-- Finish Button -->
+              <button *ngIf="transformedImage" class="btn btn-success mt-3" (click)="finishTransformation()">Finish</button>
+
+              <!-- Cancel Transformations Button -->
+              <button *ngIf="transforming" class="btn btn-danger mt-3 mx-3" (click)="cancelTransformations()">Cancel Transformations</button>
+
+            </div>
           </div>
         </div>
       </div>
