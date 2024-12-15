@@ -14,7 +14,6 @@ export class ImageViewComponent implements OnInit {
 
   constructor(private imageService: ImageServiceService) {}
 
-  imageName: string = '';
   imageUrl: string | null = null;
   selectedCategory: string | null = 'aGrass'; // Default category
   categoryImages: any[] = []; // To hold images fetched by category
@@ -32,15 +31,18 @@ export class ImageViewComponent implements OnInit {
   getImagesByCategory(category: string): void {
     // Reset the imageUrl when fetching by category
     this.imageUrl = null;
-    
+  
     // Fetch images by category from the backend
     this.imageService.getImagesByCategory(category).subscribe({
       next: (images) => {
-        // Prepend localhost URL to each image path
-        this.categoryImages = images.map((image: { path: any; }) => ({
-          ...image,
-          path: `http://localhost:3000${image.path}` // Add the localhost to the image path
-        }));
+        // Prepend localhost URL to each image path with the relative path extraction
+        this.categoryImages = images.map((image: { path: string }) => {
+          const relativePath = image.path.split('/src/upload_folder/')[1]; // Extract relative path
+          return {
+            ...image,
+            path: `http://localhost:3000/uploaded_images/${relativePath}` // Full URL to image
+          };
+        });
       },
       error: (err) => {
         console.error('Error fetching images by category:', err);
@@ -49,35 +51,6 @@ export class ImageViewComponent implements OnInit {
     });
   }
   
-
-  getImageByName(name: string): void {
-    // Reset category to null to hide category-based images
-    this.selectedCategory = null;
-    this.categoryImages = []; // Clear category images
-
-    // Ensure the name ends with .jpg
-    if (!name.endsWith('.jpg')) {
-      name += '.jpg';
-    }
-
-    // Fetch image by name
-    this.imageService.getImagesByName(name).subscribe({
-      next: (imageInfo) => {
-        if (imageInfo && imageInfo.length > 0) {
-          const imagePath = imageInfo[0].path;
-          this.imageUrl = `http://localhost:3000${imagePath}`;
-          console.log(imageInfo)
-        } else {
-          this.imageUrl = null;
-          console.log('No image found');
-        }
-      },
-      error: (err) => {
-        console.error('Error fetching image by name:', err);
-        this.imageUrl = null;
-      }
-    });
-  }
 
   deleteImage(id: string): void {
     this.imageService.deleteImageById(id).subscribe({

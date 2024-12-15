@@ -101,13 +101,12 @@ router.get('/all', async (req, res) => {
   }
 });
 
-// Endpoint to fetch images by name
 router.get('/name/:name', async (req, res) => {
   try {
     const { name } = req.params;
-
-    // Find all images with the specified name
+    console.log(`Fetching image by name: ${name}`);
     const images = await Image.find({ name });
+    console.log(`Images found:`, images);
 
     if (!images.length) {
       return res.status(404).json({ error: 'No images found with the specified name.' });
@@ -119,6 +118,7 @@ router.get('/name/:name', async (req, res) => {
     res.status(500).json({ error: 'Error fetching images' });
   }
 });
+
 
 // DELETE: Delete an image by MongoDB ObjectId
 router.delete('/delete/:id', async (req, res) => {
@@ -192,6 +192,35 @@ router.get('/category/:category', async (req, res) => {
     console.error('Error fetching images by category:', err);
     res.status(500).json({ error: 'Error fetching images' });
   }
+});
+
+// Endpoint to download an image by ID
+app.get('/download_image/:id', (req, res) => {
+  const imageId = req.params.id;
+
+  // Fetch image details from your database using the ID (adjust as needed)
+  // Assuming you have a function like `getImageById` that retrieves the image info from the database
+  Image.findById(imageId, (err, image) => {
+    if (err || !image) {
+      return res.status(404).send('Image not found');
+    }
+
+    const imagePath = path.join(__dirname, image.path.replace('/src/upload_folder/', ''));
+
+    // Check if the file exists
+    fs.exists(imagePath, (exists) => {
+      if (exists) {
+        res.download(imagePath, image.name, (err) => {
+          if (err) {
+            console.error('Error downloading image:', err);
+            return res.status(500).send('Server error');
+          }
+        });
+      } else {
+        return res.status(404).send('Image not found');
+      }
+    });
+  });
 });
 
 module.exports = router;
