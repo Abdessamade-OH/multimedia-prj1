@@ -12,7 +12,7 @@ const validCategories = ['aGrass', 'bField', 'cIndustry', 'dRiverLake', 'eForest
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, './uploaded_images'); // Save files to uploaded_images folder
+    cb(null, './src/upload_folder'); // Save files to uploaded_images folder
   },
   filename: (req, file, cb) => {
     const uniqueFilename = `${Date.now()}-${file.originalname}`;
@@ -42,7 +42,7 @@ router.post('/upload', upload.array('images', 400), async (req, res) => {
     const imageDocs = files.map(file => ({
       name: file.originalname, // Original name for user reference
       category,
-      path: `/uploaded_images/${file.filename}`, // File path
+      path: `/src/upload_folder/${file.filename}`, // File path
     }));
 
     // Insert documents into the database

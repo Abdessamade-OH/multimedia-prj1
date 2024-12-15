@@ -22,7 +22,7 @@ const corsOptions = {
 app.use(cors(corsOptions)); // Use CORS with options
 app.use(express.json()); // Parse JSON bodies
 app.use(cookieParser()); // Parse cookies
-app.use('/uploaded_images', express.static(path.join(__dirname, 'uploaded_images')));
+app.use('/uploaded_images', express.static(path.join(__dirname, '/src/upload_folder')));
 app.use(express.urlencoded({ extended: true })); // For form-data (text fields)
 
 // MongoDB Connection
