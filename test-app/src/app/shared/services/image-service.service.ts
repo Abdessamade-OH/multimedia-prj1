@@ -46,4 +46,10 @@ export class ImageServiceService {
       }
     });
   }
+
+  // Get images by category
+  getImagesByCategory(category: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/category/${category}`);
+  }
+
 }

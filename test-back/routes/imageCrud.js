@@ -133,4 +133,30 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// GET: Fetch images by category
+router.get('/category/:category', async (req, res) => {
+  try {
+    const { category } = req.params;
+
+    // Validate category (optional, based on your requirements)
+    if (!validCategories.includes(category)) {
+      return res.status(400).json({
+        error: `Invalid category. Please choose from: ${validCategories.join(', ')}`,
+      });
+    }
+
+    // Find images that match the category
+    const images = await Image.find({ category });
+
+    if (!images.length) {
+      return res.status(404).json({ error: 'No images found in this category.' });
+    }
+
+    res.status(200).json(images);
+  } catch (err) {
+    console.error('Error fetching images by category:', err);
+    res.status(500).json({ error: 'Error fetching images' });
+  }
+});
+
 module.exports = router;

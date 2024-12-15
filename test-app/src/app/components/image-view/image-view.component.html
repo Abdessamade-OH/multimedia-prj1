@@ -1,5 +1,5 @@
 <section>
-  <div class="container">
+  <div class="container-fluid">
     <div class="row">
       <div class="col-12">
         <h3>View your Images</h3>
@@ -12,9 +12,13 @@
                 Categories
               </button>
               <ul class="dropdown-menu">
-                <li><a class="dropdown-item" href="#">categorie 1</a></li>
-                <li><a class="dropdown-item" href="#">categorie 2</a></li>
-                <li><a class="dropdown-item" href="#">categorie 3</a></li>
+                <li><a class="dropdown-item" (click)="selectCategory('aGrass')">Grass</a></li>
+                <li><a class="dropdown-item" (click)="selectCategory('bField')">Field</a></li>
+                <li><a class="dropdown-item" (click)="selectCategory('cIndustry')">Industry</a></li>
+                <li><a class="dropdown-item" (click)="selectCategory('dRiverLake')">River Lake</a></li>
+                <li><a class="dropdown-item" (click)="selectCategory('eForest')">Forest</a></li>
+                <li><a class="dropdown-item" (click)="selectCategory('fResident')">Resident</a></li>
+                <li><a class="dropdown-item" (click)="selectCategory('gParking')">Parking</a></li>
               </ul>
             </div>
             <div class="d-flex flex-row justify-content-between align-items-center gap-2">
@@ -26,18 +30,51 @@
       </div>
     </div>
 
-    <div class="row">
-      <div class="col-12 border border-radius-2">
-        <div class="row">
-          <div class="col-12 d-flex flex-col justify-content-center">
-            <!-- Show the image if the URL is set -->
-            <img *ngIf="imageUrl" [src]="imageUrl" alt="Image" class="img-fluid">
-            <!-- Optionally show a placeholder if no image is found -->
-            <div *ngIf="!imageUrl">No image found</div>
+    <!-- Show the selected category images -->
+    <div *ngIf="selectedCategory && categoryImages.length" class="overflow-y-auto overflow-x-hidden my-5" style="max-height: 600px;">
+      <div class="row">
+        <div class="col-12 border border-radius-2">
+          <div class="row">
+            <div class="col-12">
+              <div class="container-fluid">
+                <div class="row">
+                  <h5>Images from Category: {{ selectedCategory }}</h5>
+                </div>
+                <div class="row g-3">
+                  <div *ngFor="let image of categoryImages" class="col-lg-3 col-md-4 col-6">
+                    <div class="card">
+                      <img [src]="image.path" alt="Image" class="card-img-top img-fluid">
+                      <div class="card-body">
+                        <!-- Display the actual image name here -->
+                        <h6 class="card-title">{{ image.name }}</h6> <!-- Dynamically display the image name -->
+                        <div class="d-flex justify-content-center gap-2 align-items-center flex-wrap">
+                          <button class="btn btn-primary btn-sm">Download</button>
+                          <button class="btn btn-danger btn-sm" (click)="deleteImage(image._id)">Remove</button>
+                          <button class="btn btn-warning btn-sm">Modify</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
-    
+
+    <!-- Show the image by name if no category is selected -->
+    <div *ngIf="!selectedCategory && imageUrl">
+      <div class="row">
+        <div class="col-12 border border-radius-2">
+          <div class="row">
+            <div class="col-12 d-flex flex-col justify-content-center">
+              <img [src]="imageUrl" alt="Image" class="img-fluid">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </section>
