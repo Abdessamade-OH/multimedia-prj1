@@ -1,44 +1,72 @@
 <section>
-    <div class="container-fluid">
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-12">
+        <h3>Simple Search</h3>
+      </div>
       <div class="row">
         <div class="col-12">
-          <h3>Simple Search</h3>
-        </div>
-        <div class="row">
-          <div class="col-12">
-            <div class="border border-radius-2 d-flex flex-row justify-content-center gap-4 align-items-center py-4 px-2">
-              <div class="d-flex flex-row justify-content-between align-items-center gap-2">
-                <input type="text" [(ngModel)]="imageName" placeholder="Enter image name" class="form-control">
-                <button (click)="getImageByName(imageName)" class="btn btn-primary">Search</button>
-                <input type="number" [(ngModel)]="numberK" placeholder="Enter number K" class="form-control" [value]="numberK || 10">
-              </div>            
+          <div class="border border-radius-2 d-flex flex-row justify-content-center gap-4 align-items-center py-4 px-2">
+            <div class="d-flex flex-row justify-content-between align-items-center gap-2">
+              <input
+                type="text"
+                [(ngModel)]="imageName"
+                placeholder="Enter image name"
+                class="form-control"
+              />
+              <button (click)="getImageByName(imageName)" class="btn btn-primary">Search</button>
+              <input
+                type="number"
+                [(ngModel)]="numberK"
+                placeholder="Enter number K"
+                class="form-control"
+                [value]="numberK || 10"
+              />
             </div>
           </div>
         </div>
       </div>
-    
-      <!-- Show the image by name and category -->
-      <!-- Update this part in your HTML -->
-<div *ngIf="imageUrl">
-    <div class="row">
-      <div class="col-12 border border-radius-2">
-        <div class="row">
-          <div class="col-12 d-flex flex-col justify-content-center">
-            <img [src]="imageUrl" alt="Image" class="img-fluid">
-            <div class="card-body">
-              <!-- Display the extracted image name here -->
-              <h6 class="card-title">{{ imageName }}</h6> <!-- Dynamically display the extracted image name -->
-              <h6 class="card-category">{{ imageCategory }}</h6> <!-- Display the category -->
-              <div class="d-flex justify-content-center gap-2 align-items-center flex-wrap">
-                <button class="btn btn-primary btn-sm" (click)="extractFeatures()">Extract Features</button>
+    </div>
+
+    <!-- Debug line to observe isLoading state -->
+    <p *ngIf="true">isLoading: {{ isLoading }}</p>
+
+    <!-- Show loading spinner when extracting features -->
+    <div *ngIf="isLoading" class="d-flex justify-content-center align-items-center my-4">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
+
+    <!-- Show the image by name and category -->
+    <div *ngIf="imageUrl && !isLoading">
+      <div class="row">
+        <div class="col-12 border border-radius-2">
+          <div class="row">
+            <div class="col-12 d-flex flex-col justify-content-center">
+              <img [src]="imageUrl" alt="Image" class="img-fluid" />
+              <div class="card-body">
+                <h6 class="card-title">{{ imageName }}</h6>
+                <h6 class="card-category">{{ imageCategory }}</h6>
+                <div class="d-flex justify-content-center gap-2 align-items-center flex-wrap">
+                  <button class="btn btn-primary btn-sm" (click)="extractFeatures()">Extract Features</button>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
-  
+
+    <!-- Show the names of the similar images -->
+    <div *ngIf="similarImages.length > 0 && !isLoading" class="mt-4">
+      <h4>Similar Images</h4>
+      <ul>
+        <li *ngFor="let image of similarImages">
+          <img [src]="image.url" alt="Image" class="img-thumbnail" />
+          {{ extractImageName(image.image_path) }}
+        </li>
+      </ul>
     </div>
-  </section>
-  
+  </div>
+</section>

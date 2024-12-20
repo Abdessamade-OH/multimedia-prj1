@@ -9,14 +9,11 @@ import pickle
 from flask import url_for
 from flask_swagger_ui import get_swaggerui_blueprint
 from feature_extractor import ImageFeatureExtractor
-from flask import Flask, request, jsonify
 from flask_cors import CORS  # Import CORS
-
-
-
 
 app = Flask(__name__)
 api = Api(app)
+
 
 # Enable CORS for all routes
 CORS(app)
@@ -1063,12 +1060,12 @@ class BatchFeatureExtractionResource(Resource):
             return {
                 'status': 'error',
                 'message': str(e)
-            }, 500
+            }, 500          
 
     def _calculate_similarity(self, query_features, dataset_features):
         """
-        Calculate weighted similarity score between query image and dataset image features
-        with improved metrics and category-aware weighting
+        Calculate weighted similarity score between query image and dataset features
+        with improved metrics, category-aware weighting, and dimension handling
         """
         try:
             total_similarity = 0.0
@@ -1076,11 +1073,11 @@ class BatchFeatureExtractionResource(Resource):
 
             # Adjusted weights to emphasize more discriminative features
             feature_weights = {
-                'color_histogram': 0.25,  # Reduced from 0.35
-                'dominant_colors': 0.20,  # Reduced from 0.25
-                'gabor_features': 0.25,   # Increased from 0.15 (texture is important)
+                'color_histogram': 0.25,
+                'dominant_colors': 0.20,
+                'gabor_features': 0.25,
                 'hu_moments': 0.10,
-                'lbp_features': 0.15,     # Increased from 0.10
+                'lbp_features': 0.15,
                 'hog_features': 0.03,
                 'glcm_features': 0.02
             }
@@ -1102,26 +1099,40 @@ class BatchFeatureExtractionResource(Resource):
                         hist2 = np.array(dataset_features[feature_type].get('histogram', []))
                         
                         if hist1.size > 0 and hist2.size > 0:
+                            # Ensure same dimensions through interpolation
+                            target_size = max(hist1.size, hist2.size)
+                            if hist1.size != target_size:
+                                hist1 = np.interp(np.linspace(0, 1, target_size), 
+                                                np.linspace(0, 1, hist1.size), hist1)
+                            if hist2.size != target_size:
+                                hist2 = np.interp(np.linspace(0, 1, target_size), 
+                                                np.linspace(0, 1, hist2.size), hist2)
+                            
                             # Normalize histograms
                             hist1 = hist1 / (np.sum(hist1) + 1e-10)
                             hist2 = hist2 / (np.sum(hist2) + 1e-10)
                             
                             # Combine multiple similarity metrics
                             intersection = np.sum(np.minimum(hist1, hist2))
-                            correlation = np.corrcoef(hist1, hist2)[0, 1] if hist1.size == hist2.size else 0
+                            correlation = np.corrcoef(hist1, hist2)[0, 1]
                             chi_square = np.sum(np.where(hist1 + hist2 != 0, 
-                                                       (hist1 - hist2) ** 2 / (hist1 + hist2), 0))
+                                                    (hist1 - hist2) ** 2 / (hist1 + hist2), 0))
                             
-                            # Weight different metrics
                             feature_similarity = (0.4 * intersection + 
-                                               0.4 * (1 / (1 + chi_square)) +
-                                               0.2 * max(0, correlation))
+                                            0.4 * (1 / (1 + chi_square)) +
+                                            0.2 * max(0, correlation))
 
                     elif feature_type == 'dominant_colors':
                         colors1 = np.array(query_features[feature_type].get('colors', []))
                         colors2 = np.array(dataset_features[feature_type].get('colors', []))
                         
                         if colors1.size > 0 and colors2.size > 0:
+                            # Ensure both color arrays are 2D
+                            if colors1.ndim == 1:
+                                colors1 = colors1.reshape(-1, 3)
+                            if colors2.ndim == 1:
+                                colors2 = colors2.reshape(-1, 3)
+                                
                             # Calculate color distance matrix
                             distances = np.zeros((len(colors1), len(colors2)))
                             for i, c1 in enumerate(colors1):
@@ -1130,7 +1141,7 @@ class BatchFeatureExtractionResource(Resource):
                             
                             # Find minimum distances for each color
                             min_distances = np.minimum(np.min(distances, axis=0).mean(),
-                                                     np.min(distances, axis=1).mean())
+                                                    np.min(distances, axis=1).mean())
                             
                             feature_similarity = 1 / (1 + min_distances)
 
@@ -1139,6 +1150,15 @@ class BatchFeatureExtractionResource(Resource):
                         feat2 = np.array(dataset_features[feature_type].get('features', []))
                         
                         if feat1.size > 0 and feat2.size > 0:
+                            # Interpolate features to match dimensions
+                            target_size = max(feat1.size, feat2.size)
+                            if feat1.size != target_size:
+                                feat1 = np.interp(np.linspace(0, 1, target_size), 
+                                                np.linspace(0, 1, feat1.size), feat1)
+                            if feat2.size != target_size:
+                                feat2 = np.interp(np.linspace(0, 1, target_size), 
+                                                np.linspace(0, 1, feat2.size), feat2)
+                            
                             # Normalize features
                             feat1_norm = feat1 / (np.linalg.norm(feat1) + 1e-10)
                             feat2_norm = feat2 / (np.linalg.norm(feat2) + 1e-10)
@@ -1152,28 +1172,28 @@ class BatchFeatureExtractionResource(Resource):
                             feature_similarity = 0.6 * cosine_sim + 0.4 * l2_sim
 
                     elif feature_type == 'lbp_features':
-                        if 'histogram' in query_features[feature_type] and 'histogram' in dataset_features[feature_type]:
-                            hist1 = np.array(query_features[feature_type]['histogram'])
-                            hist2 = np.array(dataset_features[feature_type]['histogram'])
-                            
+                        hist1 = np.array(query_features[feature_type].get('histogram', []))
+                        hist2 = np.array(dataset_features[feature_type].get('histogram', []))
+                        
+                        if hist1.size > 0 and hist2.size > 0:
                             # Match histogram sizes through interpolation
-                            target_size = max(hist1.shape[0], hist2.shape[0])
-                            x1 = np.linspace(0, 1, hist1.shape[0])
-                            x2 = np.linspace(0, 1, hist2.shape[0])
-                            x_new = np.linspace(0, 1, target_size)
-                            
-                            hist1_interp = np.interp(x_new, x1, hist1)
-                            hist2_interp = np.interp(x_new, x2, hist2)
+                            target_size = max(hist1.size, hist2.size)
+                            if hist1.size != target_size:
+                                hist1 = np.interp(np.linspace(0, 1, target_size), 
+                                                np.linspace(0, 1, hist1.size), hist1)
+                            if hist2.size != target_size:
+                                hist2 = np.interp(np.linspace(0, 1, target_size), 
+                                                np.linspace(0, 1, hist2.size), hist2)
                             
                             # Normalize
-                            hist1_interp = hist1_interp / (np.sum(hist1_interp) + 1e-10)
-                            hist2_interp = hist2_interp / (np.sum(hist2_interp) + 1e-10)
+                            hist1 = hist1 / (np.sum(hist1) + 1e-10)
+                            hist2 = hist2 / (np.sum(hist2) + 1e-10)
                             
                             # Combine multiple similarity metrics
-                            intersection = np.sum(np.minimum(hist1_interp, hist2_interp))
-                            chi_square = np.sum(np.where(hist1_interp + hist2_interp != 0,
-                                                       (hist1_interp - hist2_interp) ** 2 / (hist1_interp + hist2_interp),
-                                                       0))
+                            intersection = np.sum(np.minimum(hist1, hist2))
+                            chi_square = np.sum(np.where(hist1 + hist2 != 0,
+                                                    (hist1 - hist2) ** 2 / (hist1 + hist2),
+                                                    0))
                             
                             feature_similarity = 0.6 * intersection + 0.4 * (1 / (1 + chi_square))
 
@@ -1554,8 +1574,8 @@ class BatchRelevanceFeedbackSearchResource(Resource):
 
                     elif feature_type == 'dominant_colors':
                         if 'percentages' in query_features[feature_type] and 'percentages' in dataset_features[feature_type]:
-                            percentages1 = np.array(query_features[feature_type]['percentages'])
-                            percentages2 = np.array(dataset_features[feature_type]['percentages'])
+                            percentages1 = np.array(query_features[feature_type]['percentages'], dtype=np.float32)
+                            percentages2 = np.array(dataset_features[feature_type]['percentages'], dtype=np.float32)
                             
                             # Match lengths if necessary
                             min_len = min(len(percentages1), len(percentages2))
@@ -1570,8 +1590,8 @@ class BatchRelevanceFeedbackSearchResource(Resource):
 
                     elif feature_type in ['gabor_features', 'hog_features']:
                         if 'features' in query_features[feature_type] and 'features' in dataset_features[feature_type]:
-                            feat1 = np.array(query_features[feature_type]['features'])
-                            feat2 = np.array(dataset_features[feature_type]['features'])
+                            feat1 = np.array(query_features[feature_type]['features'], dtype=np.float32)
+                            feat2 = np.array(dataset_features[feature_type]['features'], dtype=np.float32)
                             
                             # Ensure same length
                             min_len = min(len(feat1), len(feat2))
@@ -1586,8 +1606,8 @@ class BatchRelevanceFeedbackSearchResource(Resource):
 
                     elif feature_type == 'hu_moments':
                         if 'moments' in query_features[feature_type] and 'moments' in dataset_features[feature_type]:
-                            moments1 = np.array(query_features[feature_type]['moments'])
-                            moments2 = np.array(dataset_features[feature_type]['moments'])
+                            moments1 = np.array(query_features[feature_type]['moments'], dtype=np.float32)
+                            moments2 = np.array(dataset_features[feature_type]['moments'], dtype=np.float32)
                             
                             # Match lengths if necessary
                             min_len = min(len(moments1), len(moments2))
@@ -1596,12 +1616,12 @@ class BatchRelevanceFeedbackSearchResource(Resource):
                             
                             # Calculate normalized similarity
                             diff = np.abs(moments1 - moments2)
-                            feature_similarity = float(np.mean(1 / (1 + diff)))  # Ensure scalar output
+                            feature_similarity = float(np.mean(1 / (1 + diff)))
 
                     elif feature_type == 'lbp_features':
                         if 'histogram' in query_features[feature_type] and 'histogram' in dataset_features[feature_type]:
-                            hist1 = np.array(query_features[feature_type]['histogram'])
-                            hist2 = np.array(dataset_features[feature_type]['histogram'])
+                            hist1 = np.array(query_features[feature_type]['histogram'], dtype=np.float32)
+                            hist2 = np.array(dataset_features[feature_type]['histogram'], dtype=np.float32)
                             
                             # Resize histograms to match shapes if necessary
                             if hist1.shape != hist2.shape:
@@ -1610,11 +1630,14 @@ class BatchRelevanceFeedbackSearchResource(Resource):
                                 hist2 = cv2.resize(hist2, (target_size, 1)).flatten()
                             
                             # Normalize histograms
-                            hist1 = hist1 / np.sum(hist1) if np.sum(hist1) > 0 else hist1
-                            hist2 = hist2 / np.sum(hist2) if np.sum(hist2) > 0 else hist2
-                            
-                            # Calculate intersection similarity
-                            feature_similarity = float(np.sum(np.minimum(hist1, hist2)))
+                            sum1 = np.sum(hist1)
+                            sum2 = np.sum(hist2)
+                            if sum1 > 0 and sum2 > 0:
+                                hist1 /= sum1
+                                hist2 /= sum2
+                                
+                                # Calculate intersection similarity
+                                feature_similarity = float(np.sum(np.minimum(hist1, hist2)))
 
                     elif feature_type == 'glcm_features':
                         common_keys = set(query_features[feature_type].keys()) & set(dataset_features[feature_type].keys())
@@ -1624,37 +1647,29 @@ class BatchRelevanceFeedbackSearchResource(Resource):
                                 val1 = query_features[feature_type][key]
                                 val2 = dataset_features[feature_type][key]
                                 
-                                # Handle potential array/list inputs
-                                if isinstance(val1, (list, np.ndarray)) and isinstance(val2, (list, np.ndarray)):
-                                    # If both are arrays, calculate similarity for each corresponding element
-                                    val1 = np.array(val1)
-                                    val2 = np.array(val2)
-                                    
-                                    # Ensure same length
-                                    min_len = min(len(val1), len(val2))
-                                    val1 = val1[:min_len]
-                                    val2 = val2[:min_len]
-                                    
-                                    # Calculate element-wise similarities
-                                    element_similarities = []
-                                    for v1, v2 in zip(val1, val2):
-                                        max_val = max(abs(float(v1)), abs(float(v2)))
-                                        if max_val > 0:
-                                            element_similarities.append(1 - abs(float(v1) - float(v2)) / max_val)
-                                    
-                                    similarities.append(np.mean(element_similarities) if element_similarities else 0)
+                                # Convert to numpy arrays and ensure float32 type
+                                val1 = np.array(val1, dtype=np.float32).flatten()
+                                val2 = np.array(val2, dtype=np.float32).flatten()
+                                
+                                # Ensure same length
+                                min_len = min(len(val1), len(val2))
+                                val1 = val1[:min_len]
+                                val2 = val2[:min_len]
+                                
+                                # Calculate element-wise similarities
+                                max_vals = np.maximum(np.abs(val1), np.abs(val2))
+                                # Avoid division by zero
+                                mask = max_vals > 0
+                                if np.any(mask):
+                                    element_similarities = 1 - np.abs(val1[mask] - val2[mask]) / max_vals[mask]
+                                    similarities.append(float(np.mean(element_similarities)))
                                 else:
-                                    # If single values, use existing logic
-                                    val1 = float(val1)
-                                    val2 = float(val2)
-                                    max_val = max(abs(val1), abs(val2))
-                                    if max_val > 0:
-                                        similarities.append(1 - abs(val1 - val2) / max_val)
+                                    similarities.append(1.0)  # If both values are zero, consider them similar
                             
-                            feature_similarity = np.mean(similarities) if similarities else 0
+                            feature_similarity = np.mean(similarities) if similarities else 0.0
 
                     # Ensure feature similarity is in [0, 1] range
-                    feature_similarity = float(max(0.0, min(1.0, feature_similarity)))  # Ensure scalar output
+                    feature_similarity = float(max(0.0, min(1.0, feature_similarity)))
                     total_similarity += feature_similarity * weight
 
                 except Exception as e:
@@ -1665,7 +1680,7 @@ class BatchRelevanceFeedbackSearchResource(Resource):
             # Normalize by actual total weight used
             if total_weight > 0:
                 final_similarity = total_similarity / total_weight
-                return float(max(0.0, min(1.0, final_similarity)))  # Ensure scalar output
+                return float(max(0.0, min(1.0, final_similarity)))
             
             return 0.0
 
