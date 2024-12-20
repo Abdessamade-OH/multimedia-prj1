@@ -18,6 +18,8 @@ export class SimpleSearchComponent {
   imageUrl: string | null = null;
   similarImages: any[] = [];
   isLoading: boolean = false; // Loading spinner state
+  features: any = {}; // Store extracted features
+
 
   constructor(private imageService: ImageServiceService) {}
 
@@ -100,6 +102,8 @@ extractFeatures(): void {
             // For example, you can update the image URL for each similar image
             image.url = imageData.imageUrl;
             image.name = imageData.imageName;
+            this.features = response.features || {}; // Store extracted features
+            console.log(this.features)
             image.category = imageData.imageCategory;
           }
 
@@ -128,4 +132,15 @@ extractFeatures(): void {
     const pathParts = imagePath.split('\\'); // Split the path by backslashes
     return pathParts[pathParts.length - 1]; // Return the last part (the name)
   }
+
+  toggleSelection(image: any): void {
+    image.isSelected = !image.isSelected;
+  }
+
+  performRelevanceSearch(): void {
+    const irrelevantImages = this.similarImages.filter((img) => img.isIrrelevant);
+    console.log('Irrelevant Images:', irrelevantImages);
+    // Call your backend API here and pass the irrelevantImages
+  }
+  
 }
