@@ -48,8 +48,8 @@
             <div class="col-12 d-flex flex-col justify-content-center">
               <img [src]="imageUrl" alt="Image" class="img-fluid" />
               <div class="card-body">
-                <h6 class="card-title">{{ imageName }}</h6>
-                <h6 class="card-category">{{ imageCategory }}</h6>
+                <h4 class="card-title">{{ imageName }}</h4>
+                <h5 class="card-category">{{ imageCategory | removeFirstLetter}}</h5>
                 <!-- Display Features -->
                 <div class="mt-3">
                   <h6>Extracted Features:</h6>
@@ -91,6 +91,9 @@
               <p class="mb-1">
                 <strong>{{ extractImageName(image.image_path) }}</strong>
               </p>
+              <p class="mb-1">
+                <strong>Category:</strong> {{ image.category | removeFirstLetter }}
+              </p>
               <p class="mb-0">
                 Similarity Score: <span class="badge bg-primary">{{ image.similarity_score | number:'1.2-2' }}</span>
               </p>
@@ -105,4 +108,28 @@
       <button class="btn btn-warning" (click)="performRelevanceSearch()">Relevance Search</button>
     </div>
   </div>
+
+  <div class="row" *ngIf="relevantSearch">
+    <div class="col-12">
+      <input
+        type="number"
+        [(ngModel)]="alpha"
+        placeholder="Enter Alpha"
+        class="form-control"
+      />
+      <input
+        type="number"
+        [(ngModel)]="beta"
+        placeholder="Enter Beta"
+        class="form-control"
+      />
+      <input
+        type="number"
+        [(ngModel)]="gamma"
+        placeholder="Enter Gamma"
+        class="form-control"
+      />
+    </div>
+  </div>
+  
 </section>

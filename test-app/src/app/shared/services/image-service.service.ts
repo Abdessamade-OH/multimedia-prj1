@@ -1,11 +1,14 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ImageServiceService {
+  relevanceSearch(relevantImages: any[], irrelevantImages: any[], alpha: number, beta: number, gamma: number) {
+    throw new Error('Method not implemented.');
+  }
 
   constructor(private http: HttpClient) { }
 
@@ -70,6 +73,20 @@ extractFeatures(imageName: string, category: string, k: number): Observable<any>
 
   // Perform the POST request with FormData as the body
   return this.http.post(`${this.baseUrl}/extract_features/${imageName}`, formData);
+}
+
+// Function to send relevance feedback query
+sendRelevanceFeedback(query: {
+  name: string;
+  category: string;
+  relevant_images: string[];
+  non_relevant_images: string[];
+}): Observable<any> {
+  const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+
+  return this.http.post(`${this.baseUrl}/relevance-feedback-search`, query, {
+    headers: headers,
+  });
 }
 
   

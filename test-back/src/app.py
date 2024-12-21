@@ -73,6 +73,8 @@ class ExtractFeaturesResource(Resource):
 
             # Look for query image in transformed folder
             query_image_path = os.path.join(app.config['UPLOAD_FOLDER'], category, image_name)
+            print(query_image_path)
+
             
             if not os.path.exists(query_image_path):
                 return {
@@ -533,23 +535,32 @@ class RelevanceFeedbackSearchResource(Resource):
             image_name = image_data['name']
             category = image_data['category']
             
-            # Validate and process relevant and non-relevant image paths
-            def _validate_image_paths(paths, base_path=''):
+            # Validate and process relevant and non-relevant image paths without category and ensuring backslashes
+            def _validate_image_paths(paths, base_path):
                 validated_paths = []
                 for path in paths:
-                    full_path = os.path.join(base_path, path)
+                    print(path)
+                    # Ensure the path uses backslashes for Windows-style paths
+                    full_path = os.path.join(base_path, path).replace('/', '\\')  # Convert forward slashes to backslashes
+                    print(full_path)
                     if os.path.exists(full_path):
                         validated_paths.append(full_path)
                     else:
                         print(f"Warning: Image path not found - {full_path}")
                 return validated_paths
 
+            # Validate relevant and non-relevant images
             relevant_images = _validate_image_paths(
-                image_data.get('relevant_images', [])
+                image_data.get('relevant_images', []),
+                app.config['UPLOAD_FOLDER']
             )
+
             non_relevant_images = _validate_image_paths(
-                image_data.get('non_relevant_images', [])
+                image_data.get('non_relevant_images', []),
+                app.config['UPLOAD_FOLDER']
             )
+
+
 
             # Validate category
             if category not in valid_categories:
@@ -560,6 +571,7 @@ class RelevanceFeedbackSearchResource(Resource):
 
             # Look for image in transformed folder
             image_path = os.path.join(app.config['UPLOAD_FOLDER'], category, image_name)
+            print(image_path)
             
             if not os.path.exists(image_path):
                 return {
