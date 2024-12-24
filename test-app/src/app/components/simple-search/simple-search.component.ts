@@ -26,6 +26,9 @@ export class SimpleSearchComponent {
   imageSelections: any[] = []; // Array to store selected images (irrelevant)
   relevantSearch: boolean = false;
 
+  relevanceSearchResults: any[] = []; // New array for relevance search results
+  showRelevanceResults: boolean = false; // New flag to control relevance results visibility
+
 
   constructor(private imageService: ImageServiceService) {}
 
@@ -159,29 +162,27 @@ extractFeatures(): void {
 
   performRelevanceSearch(): void {
     console.log('Alpha:', this.alpha, 'Beta:', this.beta, 'Gamma:', this.gamma);
-  
+    this.isLoading = true;
+
     const relevantImages: string[] = [];
     const nonRelevantImages: string[] = [];
     let requestsCompleted = 0;
-    const totalRequests = this.similarImages.length + 1; // Include the single image as well
-  
-    // Helper function to construct image path
+    const totalRequests = this.similarImages.length + 1;
+
     const constructImagePath = (imageData: any): string => {
       return `${imageData.imageCategory}/${imageData.imageName}`;
     };
-  
+
     console.log(this.imageName);
-    // Process the main image (this is the single image you are searching for)
-    const mainImageName = this.extractImageName(this.imageName); // Extract image name for the main image
+    const mainImageName = this.extractImageName(this.imageName);
     console.log(mainImageName);
+    
     this.getImageByName2(mainImageName).subscribe({
       next: (imageData) => {
         if (imageData) {
-          relevantImages.push(constructImagePath(imageData)); // Construct full image path for the main image
-          console.log('Main image data:', imageData); // Log the main image data
-          console.log('Main image path:', constructImagePath(imageData)); // Log image name with category
-        } else {
-          console.log('Error: No image data found for main image');
+          relevantImages.push(constructImagePath(imageData));
+          console.log('Main image data:', imageData);
+          console.log('Main image path:', constructImagePath(imageData));
         }
         checkCompletion();
       },
@@ -190,20 +191,15 @@ extractFeatures(): void {
         checkCompletion();
       },
     });
-  
-    // Process relevant images (for similar images that are not selected)
+
     this.similarImages
       .filter((img) => !this.imageSelections.includes(img))
       .forEach((img) => {
-        const imageName = this.extractImageName(img.image_path); // Extract name for each similar image
+        const imageName = this.extractImageName(img.image_path);
         this.getImageByName2(imageName).subscribe({
           next: (imageData) => {
             if (imageData) {
-              relevantImages.push(constructImagePath(imageData)); // Construct full image path
-              console.log('Relevant image data:', imageData); // Log relevant image data
-              console.log('Relevant image path:', constructImagePath(imageData)); // Log image name with category
-            } else {
-              console.log('Error: No image data found for relevant image');
+              relevantImages.push(constructImagePath(imageData));
             }
             checkCompletion();
           },
@@ -213,18 +209,13 @@ extractFeatures(): void {
           },
         });
       });
-  
-    // Process non-relevant images (for selected images)
+
     this.imageSelections.forEach((img) => {
-      const imageName = this.extractImageName(img.image_path); // Extract name for each selected image
+      const imageName = this.extractImageName(img.image_path);
       this.getImageByName2(imageName).subscribe({
         next: (imageData) => {
           if (imageData) {
-            nonRelevantImages.push(constructImagePath(imageData)); // Construct full image path
-            console.log('Non-relevant image data:', imageData); // Log non-relevant image data
-            console.log('Non-relevant image path:', constructImagePath(imageData)); // Log image name with category
-          } else {
-            console.log('Error: No image data found for non-relevant image');
+            nonRelevantImages.push(constructImagePath(imageData));
           }
           checkCompletion();
         },
@@ -234,36 +225,77 @@ extractFeatures(): void {
         },
       });
     });
-  
+
     const checkCompletion = () => {
       requestsCompleted++;
       if (requestsCompleted === totalRequests) {
-        // Build the query and send the relevance feedback once all requests are done
-        console.log(this.imageName)
-        console.log(this.stripPrefix(this.imageName))
         const query = {
           name: this.imageName,
           category: this.imageCategory,
           relevant_images: relevantImages,
           non_relevant_images: nonRelevantImages,
+          alpha: this.alpha,
+          beta: this.beta,
+          gamma: this.gamma
         };
-  
-        console.log('Query for relevance feedback:', query); // Log the query being sent
-  
+
+        console.log('Query for relevance feedback:', query);
+
         this.imageService.sendRelevanceFeedback(query).subscribe({
           next: (response) => {
-            console.log('Relevance feedback response:', response); // Log the response from the service
-            // Handle the response (e.g., update UI with new results)
+            console.log('Relevance feedback response:', response);
+            // Store results in the new array instead of overwriting similarImages
+            this.relevanceSearchResults = response.similar_images || [];
+            
+            let responseRequestsCompleted = 0;
+            const totalResponseRequests = this.relevanceSearchResults.length;
+
+            this.relevanceSearchResults.forEach((image: any) => {
+              const imageName = this.extractImageName(image.image_path);
+              this.getImageByName2(imageName).subscribe({
+                next: (imageData) => {
+                  if (imageData) {
+                    image.url = imageData.imageUrl;
+                    image.name = imageData.imageName;
+                    image.category = imageData.imageCategory;
+                  }
+                  
+                  responseRequestsCompleted++;
+                  if (responseRequestsCompleted === totalResponseRequests) {
+                    this.isLoading = false;
+                    this.showRelevanceResults = true; // Show relevance results section
+                  }
+                },
+                error: (err) => {
+                  console.error('Error processing response image:', err);
+                  responseRequestsCompleted++;
+                  if (responseRequestsCompleted === totalResponseRequests) {
+                    this.isLoading = false;
+                    this.showRelevanceResults = true;
+                  }
+                }
+              });
+            });
+
+            if (totalResponseRequests === 0) {
+              this.isLoading = false;
+              this.showRelevanceResults = true;
+            }
           },
           error: (error) => {
-            console.error('Error sending relevance feedback:', error); // Log any error
+            console.error('Error sending relevance feedback:', error);
+            this.isLoading = false;
           },
         });
       }
     };
   }
   
-
-  
-  
+  // Add this to your SimpleSearchComponent class
+getRGBString(color: number[]): string {
+  if (!color || color.length !== 3) return 'rgb(0, 0, 0)';
+  return `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
 }
+}
+
+
