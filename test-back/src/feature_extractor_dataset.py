@@ -7,6 +7,15 @@ from skimage.feature import local_binary_pattern, hog
 from skimage.color import rgb2gray
 from scipy.stats import moment
 import joblib
+from scipy.special import sph_harm
+import trimesh
+from tqdm import tqdm
+from scipy.ndimage import gaussian_filter
+import scipy.ndimage
+from scipy import ndimage
+import pickle
+from scipy.fft import fftn
+from pathlib import Path
 
 class FeatureExtractor:
     def __init__(self, rsscn7_path='RSSCN7', cache_path='feature_cache'):
@@ -261,6 +270,142 @@ class FeatureExtractor:
         
         return None
 
+class FeatureExtractor3d:
+    def __init__(self, cache_dir="feature_cache_3d"):
+        self.cache_dir = cache_dir
+        self.categories = [
+            'Alabastron', 'Amphora', 'Abstract', 'Aryballos', 'Bowl', 'Dinos',
+            'Hydria', 'Kalathos', 'Kantharos', 'Krater', 'Kyathos', 'Kylix',
+            'Lagynos', 'Lebes', 'Lekythos', 'Lydion', 'Mastos', 'Modern-Bottle',
+            'Modern-Glass', 'Modern-Mug', 'Modern-Vase', 'Mug', 'Native American - Bottle',
+            'Native American - Bowl', 'Native American - Effigy', 'Native American - Jar',
+            'Nestoris', 'Oinochoe', 'Other', 'Pelike', 'Picher Shaped', 'Pithoeidi',
+            'Pithos', 'Psykter', 'Pyxis', 'Skyphos'
+        ]
+        
+    def prepare_mesh(self, mesh):
+        """Normalize mesh for scale, translation and rotation invariance"""
+        # Center the mesh
+        mesh.vertices -= mesh.vertices.mean(axis=0)
+        
+        # Scale to unit sphere
+        max_distance = np.max(np.linalg.norm(mesh.vertices, axis=1))
+        mesh.vertices /= max_distance
+        
+        return mesh
+
+    def compute_fourier_descriptor(self, mesh, grid_size=32):
+        """Compute 3D Fourier descriptors"""
+        # Convert mesh to voxel grid
+        voxels = mesh.voxelized(pitch=1.0/grid_size).fill()
+        voxel_grid = voxels.matrix
+        
+        # Compute 3D FFT
+        fft_coeffs = fftn(voxel_grid)
+        
+        # Take magnitude of coefficients (for rotation invariance)
+        magnitude_spectrum = np.abs(fft_coeffs)
+        
+        # Normalize
+        magnitude_spectrum /= magnitude_spectrum[0,0,0]
+        
+        # Get low frequency coefficients
+        descriptor = magnitude_spectrum[:8,:8,:8].flatten()
+        
+        return descriptor
+
+    def compute_zernike_descriptor(self, mesh, max_order=8):
+        """Compute 3D Zernike moments"""
+        # Convert mesh to point cloud
+        points = mesh.vertices
+        
+        # Normalize points to [-1, 1] cube
+        points = 2 * (points - points.min(axis=0)) / (points.max(axis=0) - points.min(axis=0)) - 1
+        
+        def zernike_polynomial(n, l, m, x, y, z):
+            r = np.sqrt(x*x + y*y + z*z)
+            theta = np.arccos(z/r)
+            phi = np.arctan2(y, x)
+            
+            # Radial polynomial
+            R = np.polynomial.legendre.legval(r, [0]*(n-l) + [1])
+            
+            # Spherical harmonics
+            P = np.polynomial.legendre.legval(np.cos(theta), [0]*abs(m) + [1])
+            
+            return R * P * np.exp(1j * m * phi)
+        
+        moments = []
+        for n in range(max_order + 1):
+            for l in range(n + 1):
+                if (n - l) % 2 == 0:
+                    for m in range(-l, l + 1):
+                        moment = np.mean([zernike_polynomial(n, l, m, x, y, z) 
+                                        for x, y, z in points])
+                        moments.append(np.abs(moment))
+        
+        return np.array(moments)
+
+    def extract_features(self, obj_path):
+        """Extract both Fourier and Zernike features from an obj file"""
+        mesh = trimesh.load_mesh(obj_path)
+        mesh = self.prepare_mesh(mesh)
+        
+        fourier_desc = self.compute_fourier_descriptor(mesh)
+        zernike_desc = self.compute_zernike_descriptor(mesh)
+        
+        return {
+            'fourier': fourier_desc,
+            'zernike': zernike_desc
+        }
+
+    def precompute_dataset_features(self, dataset_path):
+        """Precompute features for all models in the dataset"""
+        from tqdm import tqdm
+        import os
+        import pickle
+        
+        # Create main progress bar for categories
+        for category in tqdm(self.categories, desc="Processing categories", unit="category"):
+            category_path = os.path.join(dataset_path, category)
+            cache_category_path = os.path.join(self.cache_dir, category)
+            
+            if not os.path.exists(cache_category_path):
+                os.makedirs(cache_category_path)
+            
+            # Get list of .obj files in the category
+            obj_files = [f for f in os.listdir(category_path) if f.endswith('.obj')]
+            
+            # Create progress bar for files within each category
+            for obj_file in tqdm(obj_files, 
+                               desc=f"Processing {category}", 
+                               unit="file",
+                               leave=False):  # Don't leave the inner progress bar
+                
+                obj_path = os.path.join(category_path, obj_file)
+                feature_path = os.path.join(
+                    cache_category_path, 
+                    obj_file.replace('.obj', '.pkl')
+                )
+                
+                if not os.path.exists(feature_path):
+                    features = self.extract_features(obj_path)
+                    with open(feature_path, 'wb') as f:
+                        pickle.dump(features, f)
+
+    def compute_similarity(self, features1, features2):
+        """Compute similarity between two feature sets"""
+        fourier_sim = 1 - np.linalg.norm(
+            features1['fourier'] - features2['fourier']
+        ) / np.linalg.norm(features1['fourier'])
+        
+        zernike_sim = 1 - np.linalg.norm(
+            features1['zernike'] - features2['zernike']
+        ) / np.linalg.norm(features1['zernike'])
+        
+        # Weighted combination
+        return 0.5 * fourier_sim + 0.5 * zernike_sim
+
 # Example usage
 if __name__ == "__main__":
     # Create feature extractor
@@ -270,3 +415,8 @@ if __name__ == "__main__":
     extractor.precompute_features()
     
     print("Feature extraction complete. Features cached in feature_cache directory.")
+
+    extractor = FeatureExtractor3d()
+    extractor.precompute_dataset_features('3DPotteryDataset_v_1/3D Models')
+
+    print("Feature extraction complete. Features cached in feature_cache_3d directory.")
