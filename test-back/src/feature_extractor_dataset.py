@@ -16,6 +16,8 @@ from scipy import ndimage
 import pickle
 from scipy.fft import fftn
 from pathlib import Path
+from sklearn.cluster import KMeans
+import open3d as o3d
 
 class FeatureExtractor:
     def __init__(self, rsscn7_path='RSSCN7', cache_path='feature_cache'):
@@ -405,6 +407,221 @@ class FeatureExtractor3d:
         
         # Weighted combination
         return 0.5 * fourier_sim + 0.5 * zernike_sim
+    
+class MeshReducer:
+    @staticmethod
+    def vertex_clustering(mesh, num_clusters=None):
+        """Reduce mesh using vertex clustering via K-means"""
+        if num_clusters is None:
+            # Default to reducing vertices by 50%
+            num_clusters = len(mesh.vertices) // 2
+            
+        # Perform k-means clustering on vertices
+        kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+        cluster_labels = kmeans.fit_predict(mesh.vertices)
+        new_vertices = kmeans.cluster_centers_
+        
+        # Create mapping from old vertices to new vertices
+        vertex_map = {i: cluster_labels[i] for i in range(len(mesh.vertices))}
+        
+        # Map faces to new vertex indices
+        new_faces = []
+        for face in mesh.faces:
+            new_face = [vertex_map[v] for v in face]
+            # Only keep faces where vertices are different
+            if len(set(new_face)) == 3:
+                new_faces.append(new_face)
+        
+        # Create new mesh
+        reduced_mesh = trimesh.Trimesh(vertices=new_vertices, faces=new_faces)
+        reduced_mesh.remove_unreferenced_vertices()
+        reduced_mesh.remove_degenerate_faces()
+        
+        return reduced_mesh
+    
+    @staticmethod
+    def edge_collapse(mesh, factor=0.7):
+        """Reduce mesh using edge collapse decimation
+        
+        Args:
+            mesh: trimesh.Trimesh object to reduce
+            factor: float between 0 and 1, target ratio of faces to keep
+            
+        Returns:
+            trimesh.Trimesh: Reduced mesh
+            
+        Raises:
+            ValueError: If decimation fails or is not supported
+        """
+        try:
+            # Convert mesh to Open3D format for decimation
+            vertices = np.asarray(mesh.vertices)
+            faces = np.asarray(mesh.faces)
+            
+            o3d_mesh = o3d.geometry.TriangleMesh()
+            o3d_mesh.vertices = o3d.utility.Vector3dVector(vertices)
+            o3d_mesh.triangles = o3d.utility.Vector3iVector(faces)
+            
+            # Calculate target number of triangles
+            target_triangles = max(4, int(len(mesh.faces) * factor))
+            
+            # Perform mesh simplification
+            reduced_o3d = o3d_mesh.simplify_quadric_decimation(target_triangles)
+            
+            if reduced_o3d is None or len(reduced_o3d.triangles) == 0:
+                raise ValueError("Decimation failed to produce a valid mesh")
+            
+            # Convert back to trimesh format
+            reduced_vertices = np.asarray(reduced_o3d.vertices)
+            reduced_faces = np.asarray(reduced_o3d.triangles)
+            
+            reduced_mesh = trimesh.Trimesh(vertices=reduced_vertices, faces=reduced_faces)
+            
+            # Clean up the mesh
+            reduced_mesh.remove_unreferenced_vertices()
+            reduced_mesh.remove_degenerate_faces()
+            reduced_mesh.fill_holes()
+            
+            if len(reduced_mesh.faces) == len(mesh.faces):
+                raise ValueError("Decimation produced no reduction in mesh complexity")
+                
+            return reduced_mesh
+            
+        except Exception as e:
+            raise ValueError(f"Edge collapse decimation failed: {str(e)}")
+
+class FeatureExtractor3dWithReduction(FeatureExtractor3d):
+    def __init__(self, cache_dir="feature_cache_3d"):
+        super().__init__(cache_dir)
+        self.reducer = MeshReducer()
+        self.base_cache_dir = "feature_cache_3d"  # Directory with original features
+        
+    def extract_features_with_reduction(self, obj_path, reduction_method='edge_collapse', reduction_params=None):
+        """Extract features from both original and reduced meshes"""
+        # Load and prepare original mesh
+        original_mesh = trimesh.load_mesh(obj_path)
+        original_mesh = self.prepare_mesh(original_mesh)
+        
+        # Extract features from original mesh
+        original_features = {
+            'fourier': self.compute_fourier_descriptor(original_mesh),
+            'zernike': self.compute_zernike_descriptor(original_mesh)
+        }
+        
+        # Reduce mesh
+        try:
+            if reduction_method == 'vertex_clustering':
+                params = reduction_params or {'num_clusters': len(original_mesh.vertices) // 2}
+                reduced_mesh = self.reducer.vertex_clustering(original_mesh, **params)
+            elif reduction_method == 'edge_collapse':
+                params = reduction_params or {'factor': 0.7}
+                reduced_mesh = self.reducer.edge_collapse(original_mesh, **params)
+            else:
+                raise ValueError(f"Unknown reduction method: {reduction_method}")
+                
+            # Prepare reduced mesh
+            reduced_mesh = self.prepare_mesh(reduced_mesh)
+            
+            # Extract features from reduced mesh
+            reduced_features = {
+                'fourier': self.compute_fourier_descriptor(reduced_mesh),
+                'zernike': self.compute_zernike_descriptor(reduced_mesh)
+            }
+            
+        except Exception as e:
+            print(f"Warning: Mesh reduction failed: {str(e)}. Using original mesh features.")
+            reduced_features = original_features
+            reduced_mesh = original_mesh
+        
+        return {
+            'original': original_features,
+            'reduced': reduced_features,
+            'reduction_info': {
+                'original_vertices': len(original_mesh.vertices),
+                'reduced_vertices': len(reduced_mesh.vertices),
+                'reduction_ratio': len(reduced_mesh.vertices) / len(original_mesh.vertices)
+            }
+        }
+
+    def load_cached_features(self, category):
+        """Load features from the original cache directory"""
+        features = []
+        cache_dir = os.path.join(self.base_cache_dir, category)
+        if not os.path.exists(cache_dir):
+            return []
+            
+        for feature_file in os.listdir(cache_dir):
+            try:
+                with open(os.path.join(cache_dir, feature_file), 'rb') as f:
+                    stored_features = pickle.load(f)
+                    
+                thumbnail_name = feature_file.replace('.pkl', '.jpg')
+                thumbnail_path = os.path.join(
+                    '3DPotteryDataset_v_1', 'Thumbnails',
+                    category, thumbnail_name
+                )
+                
+                if os.path.exists(thumbnail_path):
+                    features.append({
+                        'features': stored_features,
+                        'thumbnail_path': thumbnail_path,
+                        'category': category
+                    })
+            except Exception as e:
+                print(f"Error loading feature file {feature_file}: {str(e)}")
+                continue
+                
+        return features
+
+class ComparativeStudy:
+    def __init__(self, feature_extractor):
+        self.feature_extractor = feature_extractor
+        
+    def compare_descriptors(self, query_obj_path, n_results=5, reduction_method='edge_collapse'):
+        """Compare search results with and without mesh reduction"""
+        # Extract features for query object
+        query_features = self.feature_extractor.extract_features_with_reduction(
+            query_obj_path,
+            reduction_method=reduction_method
+        )
+        
+        results = {
+            'original': [],
+            'reduced': [],
+            'query_info': query_features['reduction_info']
+        }
+        
+        # Load all cached features
+        all_features = []
+        for category in self.feature_extractor.categories:
+            all_features.extend(self.feature_extractor.load_cached_features(category))
+        
+        # Compare with both original and reduced features
+        for feature_type in ['original', 'reduced']:
+            similarities = []
+            query_descriptors = query_features[feature_type]
+            
+            for stored_feature in all_features:
+                try:
+                    similarity = self.feature_extractor.compute_similarity(
+                        query_descriptors,
+                        stored_feature['features']
+                    )
+                    
+                    similarities.append({
+                        'thumbnail_path': stored_feature['thumbnail_path'],
+                        'similarity': float(similarity),
+                        'category': stored_feature['category']
+                    })
+                except Exception as e:
+                    print(f"Error computing similarity: {str(e)}")
+                    continue
+            
+            # Sort and store results
+            similarities.sort(key=lambda x: x['similarity'], reverse=True)
+            results[feature_type] = similarities[:n_results]
+        
+        return results
 
 # Example usage
 if __name__ == "__main__":

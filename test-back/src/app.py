@@ -17,7 +17,7 @@ import numpy.linalg as LA
 import trimesh
 from flask_restful import Api, Resource, reqparse
 from werkzeug.datastructures import FileStorage
-from feature_extractor_dataset import FeatureExtractor3d
+from feature_extractor_dataset import FeatureExtractor3d, ComparativeStudy, FeatureExtractor3dWithReduction
 
 app = Flask(__name__)
 api = Api(app)
@@ -1034,9 +1034,68 @@ class ModelSearch(Resource):
 
         except Exception as e:
             return {'error': f'Unexpected error: {str(e)}'}, 500
+        
+class ComparativeModelSearch(Resource):
+    def __init__(self):
+        self.parser = reqparse.RequestParser()
+        self.parser.add_argument('model', type=FileStorage, location='files', required=True)
+        self.parser.add_argument('n_results', type=int, default=5, location='form')
+        self.parser.add_argument('reduction_method', 
+                               type=str, 
+                               default='vertex_clustering',
+                               choices=['vertex_clustering', 'edge_collapse'],
+                               location='form')
+        self.feature_extractor = FeatureExtractor3dWithReduction()
+        self.comparative_study = ComparativeStudy(self.feature_extractor)
+
+    def post(self):
+        try:
+            args = self.parser.parse_args()
+            file = args['model']
+            n_results = args['n_results']
+            reduction_method = args['reduction_method']
+
+            if not file or file.filename == '':
+                return {'error': 'No file provided'}, 400
+
+            if not allowed_file_3d(file.filename):
+                return {'error': f'Invalid file extension. Allowed extensions are: {ALLOWED_EXTENSIONS_3d}'}, 400
+
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            
+            try:
+                file.save(filepath)
+                if not os.path.exists(filepath) or os.path.getsize(filepath) == 0:
+                    return {'error': 'Failed to save file or file is empty'}, 400
+
+                # Perform comparative analysis
+                results = self.comparative_study.compare_descriptors(
+                    filepath,
+                    n_results=n_results,
+                    reduction_method=reduction_method
+                )
+
+                return {
+                    'comparative_results': results,
+                    'reduction_method': reduction_method
+                }, 200
+
+            except Exception as e:
+                return {'error': f'Failed to process 3D model: {str(e)}'}, 500
+
+            finally:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+
+        except Exception as e:
+            return {'error': f'Unexpected error: {str(e)}'}, 500
 
 # Add to your existing app.py:
 api.add_resource(ModelSearch, '/search_3d_model')
+api.add_resource(ComparativeModelSearch, '/compare_3d_search')
 
 # Register API routes
 api.add_resource(ExtractFeaturesResource, '/extract_features/<string:image_name>')
