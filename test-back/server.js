@@ -12,6 +12,8 @@ dotenv.config(); // Load environment variables
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+
+
 // CORS configuration
 const corsOptions = {
   origin: 'http://localhost:4200', // Allow requests from this origin
@@ -20,10 +22,14 @@ const corsOptions = {
 
 // Middleware
 app.use(cors(corsOptions)); // Use CORS with options
-app.use(express.json()); // Parse JSON bodies
+//app.use(express.json()); // Parse JSON bodies
 app.use(cookieParser()); // Parse cookies
 app.use('/uploaded_images', express.static(path.join(__dirname, 'src', 'upload_folder')));
-app.use(express.urlencoded({ extended: true })); // For form-data (text fields)
+//app.use(express.urlencoded({ extended: true })); // For form-data (text fields)
+
+
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ limit: '500mb', extended: true }));
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI)

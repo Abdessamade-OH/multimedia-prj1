@@ -204,6 +204,28 @@
                         </div>
                       </div>
                     </div>
+
+                    <!-- Gabor Features Tab -->
+                <div class="tab-pane fade" id="gabor" role="tabpanel">
+                  <h6>Gabor Features</h6>
+                  <div class="d-flex flex-wrap gap-1">
+                    <span *ngFor="let feature of features?.gabor_features?.features"
+                          class="badge bg-secondary">
+                      {{ feature.toFixed(3) }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- HOG Features Tab -->
+                <div class="tab-pane fade" id="hog" role="tabpanel">
+                  <h6>HOG Features</h6>
+                  <div class="d-flex flex-wrap gap-1">
+                    <span *ngFor="let feature of features?.hog_features?.features"
+                          class="badge bg-info">
+                      {{ feature.toFixed(3) }}
+                    </span>
+                  </div>
+                </div>
                   </div>
                 </div>
               </div>
@@ -247,7 +269,7 @@
       </div>
     </div>
 
-    <!-- Relevance Search Parameters -->
+    <!-- Relevance Search Parameters 
     <div *ngIf="relevantSearch" class="my-4">
       <h4>Relevance Search Parameters</h4>
       <div class="row g-3">
@@ -276,7 +298,7 @@
           />
         </div>
       </div>
-    </div>
+    </div>-->
 
     <!-- Relevance Search Button -->
     <div *ngIf="similarImages.length > 0 && !isLoading" class="my-3 d-flex justify-content-end">

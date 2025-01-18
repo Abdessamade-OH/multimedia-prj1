@@ -4,6 +4,9 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { catchError, map, Observable, of } from 'rxjs';
 import { RemoveFirstLetterPipe } from "../../remove-first-letter.pipe";
+import { Chart, ChartConfiguration, ChartData } from 'chart.js';
+import { BaseChartDirective } from 'ng2-charts';
+
 
 @Component({
   selector: 'app-simple-search',
@@ -19,7 +22,7 @@ export class SimpleSearchComponent {
   imageUrl: string | null = null;
   similarImages: any[] = [];
   isLoading: boolean = false; // Loading spinner state
-  features: any = {}; // Store extracted features
+  //features: any = {}; // Store extracted features
   alpha!: number; // New alpha input
   beta!: number;   // New beta input
   gamma!: number;  // New gamma input
@@ -291,11 +294,151 @@ extractFeatures(): void {
     };
   }
   
-  // Add this to your SimpleSearchComponent class
-getRGBString(color: number[]): string {
-  if (!color || color.length !== 3) return 'rgb(0, 0, 0)';
-  return `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
-}
+  features: any = {
+    color_histogram: {
+      red: [0.2, 0.4, 0.1, 0.3],
+      green: [0.1, 0.3, 0.4, 0.2],
+      blue: [0.3, 0.2, 0.3, 0.2],
+    },
+    dominant_colors: {
+      colors: [[255, 0, 0], [0, 255, 0], [0, 0, 255]],
+      percentages: [0.6, 0.3, 0.1],
+    },
+    glcm_features: {
+      contrast: 0.5,
+      dissimilarity: 0.6,
+      homogeneity: 0.7,
+      energy: 0.8,
+      correlation: 0.9,
+    },
+    lbp_features: {
+      histogram: [0.1, 0.2, 0.3, 0.4, 0.5],
+      parameters: { radius: 1, n_points: 8 },
+    },
+    hu_moments: {
+      moments: [0.12, 0.45, 0.67, 0.89, 0.23],
+      names: ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5'],
+    }
+  };
+
+  // Color distribution chart data
+  colorChartData: ChartData<'bar'> = {
+    labels: ['Red', 'Green', 'Blue'],
+    datasets: [
+      {
+        data: this.features?.color_histogram ? [
+          this.features.color_histogram.red.reduce((a: any, b: any) => a + b, 0), 
+          this.features.color_histogram.green.reduce((a: any, b: any) => a + b, 0), 
+          this.features.color_histogram.blue.reduce((a: any, b: any) => a + b, 0)
+        ] : [0, 0, 0],
+        backgroundColor: ['red', 'green', 'blue']
+      }
+    ]
+  };
+
+  // Texture GLCM Features chart data
+  glcmChartData: ChartData<'bar'> = {
+    labels: ['Contrast', 'Dissimilarity', 'Homogeneity', 'Energy', 'Correlation'],
+    datasets: [
+      {
+        data: this.features?.glcm_features ? [
+          this.features.glcm_features.contrast,
+          this.features.glcm_features.dissimilarity,
+          this.features.glcm_features.homogeneity,
+          this.features.glcm_features.energy,
+          this.features.glcm_features.correlation
+        ] : [0, 0, 0, 0, 0],
+        backgroundColor: '#007bff'
+      }
+    ]
+  };
+
+  // LBP Histogram chart data
+  lbpChartData: ChartData<'bar'> = {
+    labels: Array.from({ length: this.features?.lbp_features?.histogram.length }, (_, i) => `Bin ${i + 1}`),
+    datasets: [
+      {
+        data: this.features?.lbp_features?.histogram || [],
+        backgroundColor: '#28a745'
+      }
+    ]
+  };
+
+  ngAfterViewInit(): void {
+    this.renderColorHistogramChart();
+    this.renderDominantColorsChart();
+    this.renderGLCMChart();
+  }
+
+  renderColorHistogramChart(): void {
+    const ctx = document.getElementById('colorHistogramChart') as HTMLCanvasElement;
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Red', 'Green', 'Blue'],
+        datasets: [
+          {
+            label: 'Color Distribution',
+            data: [
+              this.features.color_histogram.red.reduce((a: any, b: any) => a + b, 0),
+              this.features.color_histogram.green.reduce((a: any, b: any) => a + b, 0),
+              this.features.color_histogram.blue.reduce((a: any, b: any) => a + b, 0),
+            ],
+            backgroundColor: ['#ff0000', '#00ff00', '#0000ff'],
+          },
+        ],
+      },
+    });
+  }
+
+  renderDominantColorsChart(): void {
+    const ctx = document.getElementById('dominantColorsChart') as HTMLCanvasElement;
+    new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: this.features.dominant_colors.colors.map((_: any, index: number) => `Color ${index + 1}`),
+        datasets: [
+          {
+            data: this.features.dominant_colors.percentages.map((p: number) => p * 100),
+            backgroundColor: this.features.dominant_colors.colors.map(
+              (rgb: any[]) => `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`
+            ),
+          },
+        ],
+      },
+    });
+  }
+
+  renderGLCMChart(): void {
+    const ctx = document.getElementById('glcmChart') as HTMLCanvasElement;
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: ['Contrast', 'Dissimilarity', 'Homogeneity', 'Energy', 'Correlation'],
+        datasets: [
+          {
+            label: 'GLCM Features',
+            data: [
+              this.features.glcm_features.contrast.reduce((a: any, b: any) => a + b, 0),
+              this.features.glcm_features.dissimilarity.reduce((a: any, b: any) => a + b, 0),
+              this.features.glcm_features.homogeneity.reduce((a: any, b: any) => a + b, 0),
+              this.features.glcm_features.energy.reduce((a: any, b: any) => a + b, 0),
+              this.features.glcm_features.correlation.reduce((a: any, b: any) => a + b, 0),
+            ],
+            borderColor: '#007bff',
+            fill: false,
+          },
+        ],
+      },
+    });
+  }
+
+  // Method to convert RGB arrays to string
+  getRGBString(color: number[]): string {
+    if (!color || color.length !== 3) return 'rgb(0, 0, 0)';
+    return `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+  }
+  
 }
 
 

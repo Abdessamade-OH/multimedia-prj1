@@ -1,96 +1,120 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
-const Image = require('../models/Image'); // Assuming this is a Mongoose model
 const fs = require('fs');
+const Image = require('../models/Image'); // Assuming this is your Mongoose model
 
 const router = express.Router();
 
-// Valid categories
-const validCategories = ['aGrass', 'bField', 'cIndustry', 'dRiverLake', 'eForest', 'fResident', 'gParking'];
+// Define valid categories
+const validCategories = [
+  "Alabastron", "Amphora", "Amphoriskos", "Aryballos", "Askos", "Bowl", "Cup", "Dinos",
+  "Epichysis", "Exaleiptron", "Skyphos", "Hydria", "Kalathos", "Kantharos", "Kernos", 
+  "Krater", "Kyathos", "Kylix", "Lagynos", "Lebes", "Lekane", "Lekythos", "Loutrophoros",
+  "Lydion", "Mastos", "Mug", "Nestoris", "Oinochoe", "Pelike", "Pithos", "Plemochoe",
+  "Psykter", "Pyxis", "Skypho s", "Other", "Modern-Bottle", "Modern-Vase", "Modern-Glass",
+  "Modern-Bowl", "Modern-Cup", "Modern-Mug", "Modern-Urn", "Modern-Pot", "Pithoeidi",
+  "Native American - Jar", "Native American - Effigy", "Native American - Bowl",
+  "Native American - Bottle", "Picher Shaped", "Abstract"
+];
 
-// Middleware to parse multipart form data
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => {
-      // Extract category from the request - this is the key change
-      const { category } = req.body;
+// Function to create category folders dynamically
+const createCategoryFolder = (category, subfolder) => {
+  const folderPath = path.join(__dirname, `../src/upload_folder/${category}/${subfolder}`);
+  fs.mkdirSync(folderPath, { recursive: true });
+  return folderPath;
+};
 
-      // Validate category
-      const validCategories = ['aGrass', 'bField', 'cIndustry', 'dRiverLake', 'eForest', 'fResident', 'gParking'];
-      
-      if (!category || !validCategories.includes(category)) {
-        return cb(new Error(`Invalid category: ${category}`));
-      }
-
-      // Create the category-specific subfolder if it doesn't exist
-      const uploadDir = path.join(__dirname, '../src/upload_folder', category);
-      
-      // Create directory if it doesn't exist
-      fs.mkdirSync(uploadDir, { recursive: true });
-
-      cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-      const uniqueFilename = `${Date.now()}-${file.originalname}`;
-      cb(null, uniqueFilename);
-    }
-  }),
-  fileFilter: (req, file, cb) => {
+// Multer storage configuration
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
     const { category } = req.body;
-    
-    const validCategories = ['aGrass', 'bField', 'cIndustry', 'dRiverLake', 'eForest', 'fResident', 'gParking'];
-    
-    // Validate category
-    if (!category || !validCategories.includes(category)) {
-      const error = new Error(`Invalid or missing category. Valid categories are: ${validCategories.join(', ')}`);
-      return cb(error, false);
+
+    if (!validCategories.includes(category)) {
+      return cb(new Error(`Invalid category: ${category}`));
     }
-    
-    cb(null, true);
+
+    const subfolder = file.fieldname === 'previews' ? 'previews' : 'objects';
+    const uploadDir = createCategoryFolder(category, subfolder);
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueFilename = `${Date.now()}-${file.originalname}`;
+    cb(null, uniqueFilename);
   }
-}).array('images', 400);
+});
 
-// POST: Upload images
-router.post('/upload', (req, res) => {
-  // Wrap multer in a promise to handle errors
-  new Promise((resolve, reject) => {
-    upload(req, res, (err) => {
-      if (err) {
-        console.error('Upload error:', err);
-        return reject(err);
+// Multer file filter
+const fileFilter = (req, file, cb) => {
+  const { category } = req.body;
+
+  if (!validCategories.includes(category)) {
+    return cb(new Error(`Invalid or missing category. Valid categories: ${validCategories.join(', ')}`), false);
+  }
+
+  cb(null, true);
+};
+
+// Multer upload middleware for multiple files
+const upload = multer({ 
+  storage, 
+  limits: { 
+    fileSize: 50 * 1024 * 1024, // 50MB per file
+    files: 500 // Allow up to 500 files per request
+  },
+  fileFilter
+}).fields([
+  { name: 'previews', maxCount: 500 }, 
+  { name: 'objects', maxCount: 500 }
+]);
+
+// POST: Upload images & 3D objects
+router.post('/upload', async (req, res) => {
+  upload(req, res, async (err) => {
+    if (err) {
+      return res.status(400).json({ error: err.message });
+    }
+
+    try {
+      const { category } = req.body;
+      const previewFiles = req.files.previews || [];
+      const objectFiles = req.files.objects || [];
+
+      if (previewFiles.length !== objectFiles.length) {
+        return res.status(400).json({ error: 'Number of previews and objects must be the same.' });
       }
-      resolve();
-    });
-  })
-  .then(async () => {
-    const files = req.files;
-    const { category } = req.body;
 
-    // Create image documents
-    const imageDocs = files.map(file => ({
-      name: file.originalname,
-      category,
-      path: `/src/upload_folder/${category}/${file.filename}`,
-    }));
+      if (!category || !validCategories.includes(category)) {
+        return res.status(400).json({ error: "Invalid category" });
+      }
+      
 
-    // Insert documents into the database
-    const savedImages = await Image.insertMany(imageDocs);
+      const uploadedFiles = await Promise.all(
+        previewFiles.map(async (preview, index) => {
+          const newImage = await Image.create({
+            name: preview.filename, // Use filename instead of originalname to avoid duplicate issues
+            category,
+            previewPath: preview.path,
+            objectPath: objectFiles[index]?.path || '',
+          });
+          return newImage;
+        })
+      );
 
-    res.status(201).json({ 
-      message: 'Images uploaded successfully!', 
-      images: savedImages 
-    });
-  })
-  .catch(err => {
-    console.error('Upload process error:', err);
-    res.status(400).json({ 
-      error: err.message || 'Error uploading images' 
-    });
+      res.status(201).json({
+        message: 'Files uploaded successfully!',
+        files: uploadedFiles
+      });
+
+    } catch (error) {
+      console.error('Error processing files:', error);
+      res.status(500).json({ error: 'Server error during upload' });
+    }
   });
 });
 
-// GET: Fetch all images
+
+// GET: Fetch all images & objects
 router.get('/all', async (req, res) => {
   try {
     const images = await Image.find();
@@ -101,103 +125,53 @@ router.get('/all', async (req, res) => {
   }
 });
 
-router.get('/name/:name', async (req, res) => {
-  try {
-    const { name } = req.params;
-    console.log(`Fetching image by name: ${name}`);
-    const images = await Image.find({ name });
-    console.log(`Images found:`, images);
-
-    if (!images.length) {
-      return res.status(404).json({ error: 'No images found with the specified name.' });
-    }
-
-    res.status(200).json(images);
-  } catch (err) {
-    console.error('Error fetching images by name:', err);
-    res.status(500).json({ error: 'Error fetching images' });
-  }
-});
-
-
-// DELETE: Delete an image by MongoDB ObjectId
+// DELETE: Delete an object by ID
 router.delete('/delete/:id', async (req, res) => {
   try {
     const { id } = req.params;
-
-    // Find the image by its MongoDB ObjectId
     const image = await Image.findById(id);
+    
     if (!image) {
-      return res.status(404).json({ error: 'Image not found' });
+      return res.status(404).json({ error: 'Object not found' });
     }
 
-    // Get the file path
-    const filePath = path.join(__dirname, '../', image.path);
+    const previewPath = path.join(__dirname, '../', image.previewPath);
+    const objectPath = path.join(__dirname, '../', image.objectPath);
 
-    // Check if the file exists
-    if (fs.existsSync(filePath)) {
-      // Delete the file from the file system
-      fs.unlinkSync(filePath);
-    }
+    if (fs.existsSync(previewPath)) fs.unlinkSync(previewPath);
+    if (fs.existsSync(objectPath)) fs.unlinkSync(objectPath);
 
-    // Delete the image document from the database
     await Image.findByIdAndDelete(id);
 
-    res.status(200).json({ message: 'Image deleted successfully!' });
+    res.status(200).json({ message: 'Object deleted successfully!' });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error deleting image' });
+    res.status(500).json({ error: 'Error deleting object' });
   }
 });
 
-// GET: Fetch an image by MongoDB ObjectId
-// GET: Fetch an image by MongoDB ObjectId
-router.get('/get_image/:id', async (req, res) => {
-  const { id } = req.params;
-  console.log('Received ID:', id); // Log the ID to ensure it's correct
-
-  try {
-    const image = await Image.findById(id);
-    if (!image) {
-      return res.status(404).json({ error: 'Image not found' });
-    }
-
-    // Send the image information back
-    res.status(200).json(image);
-  } catch (err) {
-    console.error('Error fetching image:', err);
-    res.status(500).json({ error: 'Error fetching image' });
-  }
-});
-
-
-// GET: Fetch images by category
+// GET: Fetch images & objects by category
 router.get('/category/:category', async (req, res) => {
   try {
     const { category } = req.params;
 
-    // Validate category (optional, based on your requirements)
     if (!validCategories.includes(category)) {
       return res.status(400).json({
-        error: `Invalid category. Please choose from: ${validCategories.join(', ')}`,
+        error: `Invalid category. Valid categories: ${validCategories.join(', ')}`,
       });
     }
 
-    // Find images that match the category
     const images = await Image.find({ category });
 
     if (!images.length) {
-      return res.status(404).json({ error: 'No images found in this category.' });
+      return res.status(404).json({ error: 'No objects found in this category.' });
     }
 
     res.status(200).json(images);
   } catch (err) {
-    console.error('Error fetching images by category:', err);
-    res.status(500).json({ error: 'Error fetching images' });
+    console.error('Error fetching objects by category:', err);
+    res.status(500).json({ error: 'Error fetching objects' });
   }
 });
-
-
-
 
 module.exports = router;

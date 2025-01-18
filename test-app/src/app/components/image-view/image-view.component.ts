@@ -2,11 +2,13 @@ import { Component, OnInit } from '@angular/core';
 import { ImageServiceService } from '../../shared/services/image-service.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ObjectViewerComponent } from "../../shared/components/object-viewer/object-viewer.component";
+
 
 @Component({
   selector: 'app-image-view',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ObjectViewerComponent],
   templateUrl: './image-view.component.html',
   styleUrls: ['./image-view.component.css']
 })
@@ -15,9 +17,27 @@ export class ImageViewComponent implements OnInit {
   constructor(private imageService: ImageServiceService) {}
 
   imageUrl: string | null = null;
-  selectedCategory: string | null = 'aGrass'; // Default category
+  selectedCategory: string | null = 'Alabastron'; // Default category
   categoryImages: any[] = []; // To hold images fetched by category
+  isModalOpen = false;
+  modalImageName: string = '';
+  modalObjectPath: string = '';  // To store the objectPath for the 3D viewer
 
+
+  // 🔥 Fix: Categories array for dropdown options
+  categories: string[] = [
+    "Alabastron", "Amphora", "Amphoriskos", "Aryballos", "Askos", "Bowl",
+    "Cup", "Dinos", "Epichysis", "Exaleiptron", "Skyphos", "Hydria", "Kalathos",
+    "Kantharos", "Kernos", "Krater", "Kyathos", "Kylix", "Lagynos", "Lebes",
+    "Lekane", "Lekythos", "Loutrophoros", "Lydion", "Mastos", "Mug", "Nestoris",
+    "Oinochoe", "Pelike", "Pithos", "Plemochoe", "Psykter", "Pyxis", "Skyphos",
+    "Other", "Modern-Bottle", "Modern-Vase", "Modern-Glass", "Modern-Bowl",
+    "Modern-Cup", "Modern-Mug", "Modern-Urn", "Modern-Pot", "Pithoeidi",
+    "Native American - Jar", "Native American - Effigy", "Native American - Bowl",
+    "Native American - Bottle", "Picher Shaped", "Abstract"
+  ];
+
+  
   ngOnInit(): void {
     // Fetch images for the default category
     this.getImagesByCategory(this.selectedCategory!);
@@ -29,28 +49,31 @@ export class ImageViewComponent implements OnInit {
   }
 
   getImagesByCategory(category: string): void {
-    // Reset the imageUrl when fetching by category
     this.imageUrl = null;
-  
-    // Fetch images by category from the backend
+
     this.imageService.getImagesByCategory(category).subscribe({
       next: (images) => {
-        // Prepend localhost URL to each image path with the relative path extraction
-        this.categoryImages = images.map((image: { path: string }) => {
-          const relativePath = image.path.split('/src/upload_folder/')[1]; // Extract relative path
+        this.categoryImages = images.map((image: { previewPath: string, objectPath: string }) => {
+          const previewFilename = image.previewPath.split('\\').pop();
+          const objectFilename = image.objectPath?.split('\\').pop(); // Extract filename
+
           return {
             ...image,
-            path: `http://localhost:3000/uploaded_images/${relativePath}` // Full URL to image
+            previewPath: `http://localhost:3000/uploaded_images/${category}/previews/${previewFilename}`,
+            objectPath: objectFilename
+              ? `http://localhost:3000/uploaded_images/${category}/objects/${objectFilename}`
+              : null
           };
         });
+
+        console.log("Corrected image paths:", this.categoryImages);
       },
       error: (err) => {
         console.error('Error fetching images by category:', err);
-        this.categoryImages = []; // Reset the images if there's an error
+        this.categoryImages = [];
       }
     });
   }
-  
 
   deleteImage(id: string): void {
     this.imageService.deleteImageById(id).subscribe({
@@ -90,6 +113,16 @@ export class ImageViewComponent implements OnInit {
     });
   }
   
-  
+
+  openModal(image: any): void {
+    this.modalImageName = image.name;
+    this.modalObjectPath = image.objectPath;  // Pass the objectPath to the modal
+    console.log(this.modalObjectPath);
+    this.isModalOpen = true;
+  }
+
+  closeModal(): void {
+    this.isModalOpen = false;
+  }
   
 }
