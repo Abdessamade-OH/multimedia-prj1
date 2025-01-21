@@ -938,87 +938,91 @@ class ModelSearch(Resource):
             file = args['model']
             n_results = args['n_results']
 
-            # Check if file was actually sent
+            # 🛑 Check if file exists
             if not file:
                 return {'error': 'No file provided'}, 400
-
-            # Check if filename exists
             if file.filename == '':
                 return {'error': 'No selected file'}, 400
 
-            # Validate file extension
+            # ✅ Validate file extension
             if not allowed_file_3d(file.filename):
                 return {'error': f'Invalid file extension. Allowed extensions are: {ALLOWED_EXTENSIONS_3d}'}, 400
 
-            # Create a secure filename and save path
+            # 📁 Save uploaded file
             filename = secure_filename(file.filename)
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-
-            # Ensure upload directory exists
             os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-            # Save the file
             try:
                 file.save(filepath)
             except Exception as e:
                 return {'error': f'Failed to save file: {str(e)}'}, 500
 
-            # Validate the saved file exists and is not empty
-            if not os.path.exists(filepath):
-                return {'error': 'Failed to save file'}, 500
-            
-            if os.path.getsize(filepath) == 0:
+            # 🛑 Check if the saved file exists and is not empty
+            if not os.path.exists(filepath) or os.path.getsize(filepath) == 0:
                 os.remove(filepath)
                 return {'error': 'Uploaded file is empty'}, 400
 
             try:
-                # Try to load the mesh first to validate it's a proper OBJ file
+                # ✅ Validate if the file is a proper 3D mesh
                 mesh = trimesh.load_mesh(filepath)
                 if mesh is None:
                     raise ValueError("Failed to load mesh")
 
+                # 🔍 Extract query features
                 query_features = feature_extractor.extract_features(filepath)
+                print(f"🔍 Extracted query features keys: {list(query_features.keys())}")
+                print(f"🔢 Sample feature values: {query_features}")
+
                 similarities = []
-                
+
+                # 📂 Search in feature cache
                 for category in feature_extractor.categories:
                     cache_dir = os.path.join('feature_cache_3d', category)
+
                     if not os.path.exists(cache_dir):
+                        print(f"❌ Feature cache directory not found: {cache_dir}")
                         continue
-                        
+
+                    print(f"✅ Checking features in category: {category}")
+
                     for feature_file in os.listdir(cache_dir):
+                        feature_path = os.path.join(cache_dir, feature_file)
+
                         try:
-                            with open(os.path.join(cache_dir, feature_file), 'rb') as f:
+                            # 🗄 Load stored features
+                            with open(feature_path, 'rb') as f:
                                 stored_features = pickle.load(f)
-                                
-                            similarity = feature_extractor.compute_similarity(
-                                query_features, stored_features
-                            )
-                            
-                            thumbnail_name = feature_file.replace('.pkl', '.jpg')
-                            thumbnail_path = os.path.join(
-                                '3DPotteryDataset_v_1', 'Thumbnails',
-                                category, thumbnail_name
-                            )
-                            
-                            if os.path.exists(thumbnail_path):
-                                similarities.append({
-                                    'thumbnail_path': thumbnail_path,
-                                    'similarity': float(similarity),
-                                    'category': category
-                                })
+
+                            print(f"📂 Loaded {feature_file}: {list(stored_features.keys())}")
+
+                            # 🔢 Compute similarity
+                            similarity = feature_extractor.compute_similarity(query_features, stored_features)
+                            print(f"🔢 Similarity for {feature_file}: {similarity}")
+
+                            if similarity > 0:  # Only add meaningful results
+                                thumbnail_name = feature_file.replace('.pkl', '.jpg')
+                                thumbnail_path = os.path.join('3DPotteryDataset_v_1', 'Thumbnails', category, thumbnail_name)
+
+                                if os.path.exists(thumbnail_path):
+                                    similarities.append({
+                                        'thumbnail_path': thumbnail_path,
+                                        'similarity': float(similarity),
+                                        'category': category
+                                    })
                         except Exception as e:
-                            print(f"Error processing feature file {feature_file}: {str(e)}")
+                            print(f"❌ Error processing feature file {feature_file}: {str(e)}")
                             continue
 
-                # Sort similarities and return top n_results
+                # 📊 Sort and return results
                 similarities.sort(key=lambda x: x['similarity'], reverse=True)
-                
-                # Convert query features to a serializable format
+
+                # 🔄 Convert query features to a serializable format
                 serializable_features = {
                     k: v.tolist() if hasattr(v, 'tolist') else v 
                     for k, v in query_features.items()
                 }
-                
+
                 return {
                     'results': similarities[:n_results],
                     'query_descriptors': serializable_features
@@ -1028,7 +1032,7 @@ class ModelSearch(Resource):
                 return {'error': f'Failed to process 3D model: {str(e)}'}, 500
 
             finally:
-                # Clean up uploaded file
+                # 🧹 Clean up uploaded file
                 if os.path.exists(filepath):
                     os.remove(filepath)
 
