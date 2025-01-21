@@ -68,6 +68,7 @@ const upload = multer({
   { name: 'objects', maxCount: 500 }
 ]);
 
+
 // POST: Upload images & 3D objects
 router.post('/upload', async (req, res) => {
   upload(req, res, async (err) => {
@@ -87,16 +88,22 @@ router.post('/upload', async (req, res) => {
       if (!category || !validCategories.includes(category)) {
         return res.status(400).json({ error: "Invalid category" });
       }
-      
 
       const uploadedFiles = await Promise.all(
         previewFiles.map(async (preview, index) => {
+          const originalName = preview.originalname; // Get the original name
+
+          // Extract the relative paths
+          const previewPath = path.relative(path.join(__dirname, "../src"), preview.path);
+          const objectPath = path.relative(path.join(__dirname, "../src"), objectFiles[index]?.path || '');
+
           const newImage = await Image.create({
-            name: preview.filename, // Use filename instead of originalname to avoid duplicate issues
+            name: originalName, 
             category,
-            previewPath: preview.path,
-            objectPath: objectFiles[index]?.path || '',
+            previewPath,
+            objectPath,
           });
+
           return newImage;
         })
       );
@@ -112,6 +119,7 @@ router.post('/upload', async (req, res) => {
     }
   });
 });
+
 
 
 // GET: Fetch all images & objects
@@ -173,5 +181,42 @@ router.get('/category/:category', async (req, res) => {
     res.status(500).json({ error: 'Error fetching objects' });
   }
 });
+
+// GET: Fetch a preview image by name and metadata
+router.get('/preview/:imageName', async (req, res) => {
+  try {
+    const { imageName } = req.params;
+
+    // Find image in the database
+    const image = await Image.findOne({ name: imageName });
+
+    if (!image) {
+      return res.status(404).json({ error: 'Image not found in database' });
+    }
+
+    const previewFolderPath = path.join(__dirname, `../src/upload_folder/${image.category}/previews/`);
+
+    // Find the correct file (with timestamp prefix)
+    const previewFile = fs.readdirSync(previewFolderPath).find(file => file.endsWith(`-${imageName}`));
+
+    if (!previewFile) {
+      return res.status(404).json({ error: 'Preview image file not found' });
+    }
+
+    // Send metadata and file path
+    res.status(200).json({
+      id: image._id,
+      name: image.name,
+      category: image.category,
+      previewPath: image.previewPath,
+      objectPath: image.objectPath
+    });
+  } catch (err) {
+    console.error('Error fetching preview image:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
 
 module.exports = router;

@@ -22,7 +22,7 @@ export class SimpleSearchComponent {
   imageUrl: string | null = null;
   similarImages: any[] = [];
   isLoading: boolean = false; // Loading spinner state
-  //features: any = {}; // Store extracted features
+  features: any = {}; // Store extracted features
   alpha!: number; // New alpha input
   beta!: number;   // New beta input
   gamma!: number;  // New gamma input
@@ -35,35 +35,49 @@ export class SimpleSearchComponent {
 
   constructor(private imageService: ImageServiceService) {}
 
+  
   getImageByName(name: string): void {
     console.log('Starting image search...');
-    this.isLoading = true; // Start loading for image retrieval
-
+    this.isLoading = true;
+  
     this.imageService.getImagesByName(name).subscribe({
       next: (imageInfo) => {
-        console.log('Image search completed');
-        if (imageInfo && imageInfo.length > 0) {
-          const imagePath = imageInfo[0].path;
-          const relativePath = imagePath.split('/src/upload_folder/')[1]; // Extract relative path
+        console.log('Image search completed:', imageInfo); // Debugging log
+  
+        // Ensure imageInfo is an object and has the required properties
+        if (imageInfo && imageInfo.previewPath) {
+          let imagePath = imageInfo.previewPath;
+  
+          // Fix backslashes for URLs
+          imagePath = imagePath.replace(/\\/g, '/');
+  
+          // Extract relative path after "upload_folder/"
+          const relativePath = imagePath.split('upload_folder/')[1];
+  
+          // Construct the full image URL
           this.imageUrl = `http://localhost:3000/uploaded_images/${relativePath}`;
-          const imageNameFromPath = relativePath.split('/').pop();
-          this.imageName = imageNameFromPath || 'Unknown';
-          this.imageCategory = imageInfo[0].category;
-          
-
-          this.isLoading = false; // Stop loading after image retrieval
+  
+          // Extract image name
+          this.imageName = imageInfo.name || 'Unknown';
+  
+          // Assign category
+          this.imageCategory = imageInfo.category;
+  
+          console.log('Image URL:', this.imageUrl);
         } else {
-          console.log('No image found');
+          console.warn('No image found or imageInfo is missing previewPath.');
           this.imageUrl = null;
-          this.isLoading = false; // Stop loading on no image found
         }
+  
+        this.isLoading = false;
       },
       error: (err) => {
         console.error('Error fetching image by name:', err);
-        this.isLoading = false; // Stop loading on error
+        this.isLoading = false;
       },
     });
   }
+  
 
   getImageByName2(name: string): Observable<any> {
     console.log('Starting image search...');
@@ -294,33 +308,7 @@ extractFeatures(): void {
     };
   }
   
-  features: any = {
-    color_histogram: {
-      red: [0.2, 0.4, 0.1, 0.3],
-      green: [0.1, 0.3, 0.4, 0.2],
-      blue: [0.3, 0.2, 0.3, 0.2],
-    },
-    dominant_colors: {
-      colors: [[255, 0, 0], [0, 255, 0], [0, 0, 255]],
-      percentages: [0.6, 0.3, 0.1],
-    },
-    glcm_features: {
-      contrast: 0.5,
-      dissimilarity: 0.6,
-      homogeneity: 0.7,
-      energy: 0.8,
-      correlation: 0.9,
-    },
-    lbp_features: {
-      histogram: [0.1, 0.2, 0.3, 0.4, 0.5],
-      parameters: { radius: 1, n_points: 8 },
-    },
-    hu_moments: {
-      moments: [0.12, 0.45, 0.67, 0.89, 0.23],
-      names: ['Hu1', 'Hu2', 'Hu3', 'Hu4', 'Hu5'],
-    }
-  };
-
+/*
   // Color distribution chart data
   colorChartData: ChartData<'bar'> = {
     labels: ['Red', 'Green', 'Blue'],
@@ -437,7 +425,7 @@ extractFeatures(): void {
   getRGBString(color: number[]): string {
     if (!color || color.length !== 3) return 'rgb(0, 0, 0)';
     return `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
-  }
+  }*/
   
 }
 

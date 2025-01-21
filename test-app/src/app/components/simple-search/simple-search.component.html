@@ -1,6 +1,6 @@
 <section>
   <div class="container-fluid">
-    
+
     <!-- Simple Search Section -->
     <div class="row">
       <div class="col-12">
@@ -38,13 +38,12 @@
       </div>
     </div>
 
-    <!-- Query Image and Features -->
     <div *ngIf="imageUrl && !isLoading" class="mt-4">
       <div class="row">
         <div class="col-12">
           <div class="card shadow-sm">
             <div class="row g-0">
-              <!-- Image Column -->
+
               <div class="col-md-4">
                 <div class="position-relative h-100">
                   <img [src]="imageUrl" 
@@ -54,7 +53,7 @@
                 </div>
               </div>
               
-              <!-- Image Info Column -->
+
               <div class="col-md-8">
                 <div class="card-body">
                   <div class="d-flex justify-content-between align-items-start">
@@ -65,7 +64,7 @@
                     <span class="badge bg-primary rounded-pill">Query Image</span>
                   </div>
                   
-                  <!-- Tabs for Different Feature Types -->
+
                   <ul class="nav nav-tabs" id="featureTabs" role="tablist">
                     <li class="nav-item" role="presentation">
                       <button class="nav-link active" 
@@ -99,15 +98,14 @@
                     </li>
                   </ul>
                   
-                 <!-- Tab Content -->
+
                   <div class="tab-content mt-3" id="featureTabsContent">
-                    <!-- Colors Tab -->
+
                     <div class="tab-pane fade show active" id="colors" role="tabpanel">
                       <div class="row">
                         <div class="col-md-6">
                           <h6 class="mb-3">Color Distribution</h6>
                           <div class="feature-chart">
-                            <!-- Simple color distribution display -->
                             <div class="d-flex flex-column gap-2">
                               <div *ngFor="let item of ['red', 'green', 'blue']" class="d-flex flex-column">
                                 <small class="text-capitalize">{{item}}</small>
@@ -128,9 +126,11 @@
                           <div class="d-flex flex-wrap gap-2">
                             <div *ngFor="let color of features?.dominant_colors?.colors; let i = index" 
                                 class="text-center">
+                                <!--
                               <div [style.background-color]="getRGBString(color)"
                                   style="width: 50px; height: 50px; border-radius: 8px;">
                               </div>
+                              -->
                               <small class="d-block text-center mt-1">
                                 {{ (features?.dominant_colors?.percentages[i] * 100).toFixed(1) }}%
                               </small>
@@ -140,7 +140,6 @@
                       </div>
                     </div>
                     
-                    <!-- Texture Tab -->
                     <div class="tab-pane fade" id="texture" role="tabpanel">
                       <div class="row">
                         <div class="col-md-6">
@@ -181,7 +180,6 @@
                       </div>
                     </div>
                     
-                    <!-- Shape Tab -->
                     <div class="tab-pane fade" id="shape" role="tabpanel">
                       <div class="row">
                         <div class="col-12">
@@ -206,7 +204,6 @@
                       </div>
                     </div>
 
-                    <!-- Gabor Features Tab -->
                 <div class="tab-pane fade" id="gabor" role="tabpanel">
                   <h6>Gabor Features</h6>
                   <div class="d-flex flex-wrap gap-1">
@@ -217,7 +214,6 @@
                   </div>
                 </div>
 
-                <!-- HOG Features Tab -->
                 <div class="tab-pane fade" id="hog" role="tabpanel">
                   <h6>HOG Features</h6>
                   <div class="d-flex flex-wrap gap-1">

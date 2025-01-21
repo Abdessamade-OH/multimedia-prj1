@@ -28,7 +28,8 @@ export class ImageServiceService {
 
   // Get images by name (returns all with the same name)
   getImagesByName(imageName: string): Observable<any> {
-    return this.http.get(`${this.apiUrl}/name/${imageName}`);
+    console.log(imageName)
+    return this.http.get(`${this.apiUrl}/preview/${imageName}`);
   }
 
   // Get all images
