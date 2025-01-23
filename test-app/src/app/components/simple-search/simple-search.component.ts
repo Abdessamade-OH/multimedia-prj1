@@ -40,6 +40,9 @@ export class SimpleSearchComponent {
   modalObjectPath: string = '';  // To store the objectPath for the 3D viewer
   image: any = null;
 
+  // New variable to control the button visibility
+  enableComparativeSearch: boolean = false; 
+
 
   constructor(private imageService: ImageServiceService, private http: HttpClient) {}
 
@@ -221,6 +224,9 @@ export class SimpleSearchComponent {
               next: (updatedResults) => {
                 this.similarImages = updatedResults;
                 console.log('Formatted similar images:', this.similarImages);
+
+                // Enable comparative search after normal search is done
+                this.enableComparativeSearch = true;  
               },
               error: (err) => {
                 console.error('Error fetching image URLs:', err);
@@ -243,6 +249,87 @@ export class SimpleSearchComponent {
         this.isLoading = false;
       });
   }
+  
+  comparative_3d_search(objectPath: string, K: number = 5): void {
+    console.log('Starting independent 3D comparative search with objectPath:', objectPath);
+  
+    this.isLoading = true;
+
+    // Normalize object path
+    //const normalizedObjectPath = `http://localhost:3000/${objectPath.replace(/\\/g, '/')}`;
+    //console.log('Resolved object path:', normalizedObjectPath);
+
+    // Fetch the object file
+    fetch(objectPath)
+      .then((response) => {
+        if (!response.ok) throw new Error(`Failed to fetch file: ${response.statusText}`);
+        return response.blob();
+      })
+      .then((blob) => {
+        const file = new File([blob], 'model.obj', { type: blob.type });
+        const formData = new FormData();
+        formData.append('model', file, file.name);
+        formData.append('n_results', K.toString());
+
+        console.log('Sending 3D model to backend for comparison...');
+
+        // Call the backend API
+        this.http.post<any>('http://localhost:5000/search_3d_model', formData).subscribe({
+          next: (response) => {
+            console.log('3D search response:', response);
+
+            if (!response || !Array.isArray(response.results)) {
+              console.warn('Invalid results format:', response);
+              this.similarImages = [];
+              this.isLoading = false;
+              return;
+            }
+
+            const imageRequests = response.results.map((result: any) => {
+              const normalizedPath = result.thumbnail_path.replace(/\\/g, '/');
+              const fileNameWithExt = normalizedPath.split('/').pop() || '';
+              const finalName = fileNameWithExt.split('.')[0] + '.jpg';
+
+              return this.getImageByNameBase(finalName).pipe(
+                map((imageUrl) => ({
+                  thumbnail_path: imageUrl,
+                  similarity: result.similarity,
+                  category: result.category
+                }))
+              );
+            });
+
+            // Process the search results
+            forkJoin<any[]>(imageRequests).subscribe({
+              next: (updatedResults) => {
+                this.similarImages = updatedResults;
+                console.log('Formatted similar images:', this.similarImages);
+
+                // Enable comparative search after normal search is done
+                this.enableComparativeSearch = true;
+              },
+              error: (err) => {
+                console.error('Error fetching image URLs:', err);
+              },
+              complete: () => {
+                this.isLoading = false;
+              }
+            });
+          },
+          error: (err) => {
+            console.error('Error in comparative 3D search:', err);
+            this.similarImages = [];
+            this.isLoading = false;
+          }
+        });
+      })
+      .catch((err) => {
+        console.error('Error processing 3D file:', err);
+        this.similarImages = [];
+        this.isLoading = false;
+      });
+}
+
   
   
   

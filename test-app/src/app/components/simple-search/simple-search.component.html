@@ -27,6 +27,7 @@
             />
             <button class="btn btn-primary" (click)="extractFeatures()">Extract Features</button>
             <button class="btn btn-primary" (click)="search_3d(modalObjectPath, 5)">Search Similar Objects</button>
+            <button class="btn btn-primary" (click)="comparative_3d_search(modalObjectPath, 5)" >Perform Comparative Search</button>
           </div>
         </div>
       </div>
@@ -240,7 +241,7 @@
 
    <!-- Initial Similar Images Section -->
   <div *ngIf="similarImages.length > 0 && !isLoading" class="my-5">
-    <h4>Similar Images (Initial Search)</h4>
+    <h4>Similar Images</h4>
     <div class="container-fluid">
       <div class="row g-4">
         <div
@@ -261,7 +262,7 @@
               <strong>{{ extractImageName(image.thumbnail_path) }}</strong>  <!-- Display image name -->
             </p>
             <p class="mb-1">
-              <strong>Category:</strong> {{ image.category | removeFirstLetter }}  <!-- Category -->
+              <strong>Category:</strong> {{ image.category }}  <!-- Category -->
             </p>
             <p class="mb-0">
               Similarity Score: <span class="badge bg-primary">{{ image.similarity | number:'1.2-2' }}</span>  <!-- Similarity score -->
@@ -308,6 +309,7 @@
     <div *ngIf="similarImages.length > 0 && !isLoading" class="my-3 d-flex justify-content-end">
       <button class="btn btn-warning" (click)="performRelevanceSearch()">Relevance Search</button>
     </div>
+    
 
     <!-- Relevance Search Results Section -->
     <div *ngIf="showRelevanceResults && relevanceSearchResults.length > 0 && !isLoading" class="my-5">
