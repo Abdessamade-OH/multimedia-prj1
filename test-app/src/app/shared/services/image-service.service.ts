@@ -14,6 +14,8 @@ export class ImageServiceService {
 
   private apiUrl = 'http://localhost:3000/api/images'; // Your backend API URL
   private baseUrl = 'http://localhost:5000'; // Flask API URL
+  private url_3d_search = 'http://localhost:5000/search_3d_model'; // Change the URL if needed
+
 
 
   // Upload images method using FormData
@@ -90,6 +92,15 @@ sendRelevanceFeedback(query: {
   });
 }
 
-  
+
+
+search3DModel(file: File, nResults: number): Observable<any> {
+  const formData = new FormData();
+  formData.append('model', file, file.name);
+  formData.append('n_results', nResults.toString());
+
+  // Use POST request to send the file and n_results
+  return this.http.post<any>(this.url_3d_search, formData);
+}
 
 }

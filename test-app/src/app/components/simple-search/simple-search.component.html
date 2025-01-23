@@ -26,6 +26,7 @@
               [value]="numberK || 10"
             />
             <button class="btn btn-primary" (click)="extractFeatures()">Extract Features</button>
+            <button class="btn btn-primary" (click)="search_3d(modalObjectPath, 5)">Search Similar Objects</button>
           </div>
         </div>
       </div>
@@ -50,7 +51,10 @@
                       alt="Query Image" 
                       class="img-fluid rounded-start h-100 w-100 object-fit-cover" 
                       style="max-height: 400px;" />
+                      <button class="btn btn-primary btn-sm" (click)="openModal({ name: imageName, objectPath: modalObjectPath })">See Object</button>
+
                 </div>
+
               </div>
               
 
@@ -232,39 +236,42 @@
       </div>
     </div>
 
-    <!-- Initial Similar Images Section -->
-    <div *ngIf="similarImages.length > 0 && !isLoading" class="my-5">
-      <h4>Similar Images (Initial Search)</h4>
-      <div class="container-fluid">
-        <div class="row g-4">
-          <div
-            class="col-12 col-md-6 col-lg-4 col-xl-3 col-xxl-2"
-            *ngFor="let image of similarImages"
-          >
-            <div class="position-relative">
-              <img
-                [src]="image.url"
-                alt="Image"
-                class="img-thumbnail selectable-image"
-                [ngClass]="{'border border-5 border-primary rounded-4 border-danger': image.isSelected}"
-                (click)="toggleSelection(image)"
-              />
-            </div>
-            <div>
-              <p class="mb-1">
-                <strong>{{ extractImageName(image.image_path) }}</strong>
-              </p>
-              <p class="mb-1">
-                <strong>Category:</strong> {{ image.category | removeFirstLetter }}
-              </p>
-              <p class="mb-0">
-                Similarity Score: <span class="badge bg-primary">{{ image.similarity_score | number:'1.2-2' }}</span>
-              </p>
-            </div>
+    
+
+   <!-- Initial Similar Images Section -->
+  <div *ngIf="similarImages.length > 0 && !isLoading" class="my-5">
+    <h4>Similar Images (Initial Search)</h4>
+    <div class="container-fluid">
+      <div class="row g-4">
+        <div
+          class="col-12 col-md-6 col-lg-4 col-xl-3 col-xxl-2"
+          *ngFor="let image of similarImages"
+        >
+          <div class="position-relative">
+            <img 
+              [src]="image.thumbnail_path" 
+              alt="Image"
+              class="img-thumbnail selectable-image"
+              [ngClass]="{'border border-5 border-primary rounded-4 border-danger': image.isSelected}"
+              (click)="toggleSelection(image)"
+            />
+          </div>
+          <div>
+            <p class="mb-1">
+              <strong>{{ extractImageName(image.thumbnail_path) }}</strong>  <!-- Display image name -->
+            </p>
+            <p class="mb-1">
+              <strong>Category:</strong> {{ image.category | removeFirstLetter }}  <!-- Category -->
+            </p>
+            <p class="mb-0">
+              Similarity Score: <span class="badge bg-primary">{{ image.similarity | number:'1.2-2' }}</span>  <!-- Similarity score -->
+            </p>
           </div>
         </div>
       </div>
     </div>
+  </div>
+
 
     <!-- Relevance Search Parameters 
     <div *ngIf="relevantSearch" class="my-4">
@@ -332,6 +339,20 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Modal -->
+  <div class="custom-modal-overlay" *ngIf="isModalOpen" (click)="closeModal()">
+    <div class="custom-modal" (click)="$event.stopPropagation()">
+      <div class="custom-modal-header">
+        <h5>{{ modalImageName }}</h5>
+        <button class="close-btn" (click)="closeModal()">✖</button>
+      </div>
+      <div class="custom-modal-body">
+        <!-- Embed the ObjectViewerComponent and pass the objectPath -->
+        <app-object-viewer [objectPath]="modalObjectPath"></app-object-viewer>
       </div>
     </div>
   </div>

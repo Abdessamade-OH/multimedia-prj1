@@ -17,7 +17,7 @@ export class ImageViewComponent implements OnInit {
   constructor(private imageService: ImageServiceService) {}
 
   imageUrl: string | null = null;
-  selectedCategory: string | null = 'Alabastron'; // Default category
+  selectedCategory: string | null = 'Amphora'; // Default category
   categoryImages: any[] = []; // To hold images fetched by category
   isModalOpen = false;
   modalImageName: string = '';

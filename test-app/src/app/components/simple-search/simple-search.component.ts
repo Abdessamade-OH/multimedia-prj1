@@ -6,12 +6,15 @@ import { catchError, map, Observable, of } from 'rxjs';
 import { RemoveFirstLetterPipe } from "../../remove-first-letter.pipe";
 import { Chart, ChartConfiguration, ChartData } from 'chart.js';
 import { BaseChartDirective } from 'ng2-charts';
+import { ObjectViewerComponent } from "../../shared/components/object-viewer/object-viewer.component";
+import { HttpClient } from '@angular/common/http';
+import { forkJoin } from 'rxjs';
 
 
 @Component({
   selector: 'app-simple-search',
   standalone: true,
-  imports: [FormsModule, CommonModule, RemoveFirstLetterPipe],
+  imports: [FormsModule, CommonModule, RemoveFirstLetterPipe, ObjectViewerComponent],
   templateUrl: './simple-search.component.html',
   styleUrls: ['./simple-search.component.css'],
 })
@@ -32,10 +35,34 @@ export class SimpleSearchComponent {
   relevanceSearchResults: any[] = []; // New array for relevance search results
   showRelevanceResults: boolean = false; // New flag to control relevance results visibility
 
+  isModalOpen = false;
+  modalImageName: string = '';
+  modalObjectPath: string = '';  // To store the objectPath for the 3D viewer
+  image: any = null;
 
-  constructor(private imageService: ImageServiceService) {}
+
+  constructor(private imageService: ImageServiceService, private http: HttpClient) {}
 
   
+  openModal(image: any): void {
+    this.modalImageName = image.name;
+  
+    if (!image.objectPath) {
+      console.warn('No object path found for this image:', image);
+      return;
+    }
+  
+    // Prepend the correct base URL
+    //this.modalObjectPath = `http://localhost:3000/${image.objectPath.replace(/\\/g, '/')}`;
+  
+    console.log(this.modalObjectPath);
+    this.isModalOpen = true;
+  }
+  
+  closeModal(): void {
+    this.isModalOpen = false;
+  }
+
   getImageByName(name: string): void {
     console.log('Starting image search...');
     this.isLoading = true;
@@ -57,8 +84,17 @@ export class SimpleSearchComponent {
           // Construct the full image URL
           this.imageUrl = `http://localhost:3000/uploaded_images/${relativePath}`;
   
-          // Extract image name
-          this.imageName = imageInfo.name || 'Unknown';
+          // Extract image name from the objectPath (last part of the path)
+          const objectFileName = imageInfo.objectPath.split('\\').pop()?.split('/').pop();
+          
+          console.log('Extracted object file name:', objectFileName);
+  
+          // If we successfully extracted the file name, set it
+          if (objectFileName) {
+            this.imageName = objectFileName;
+          } else {
+            this.imageName = 'Unknown';
+          }
   
           // Assign category
           this.imageCategory = imageInfo.category;
@@ -70,6 +106,16 @@ export class SimpleSearchComponent {
         }
   
         this.isLoading = false;
+  
+        this.image = {
+          name: this.imageName,
+          objectPath: imageInfo.objectPath // Ensure `imageInfo.objectPath` exists
+        };
+  
+        // Construct the object path using name and category, appending .obj to the `imageInfo.name`
+        this.modalObjectPath = `http://localhost:3000/uploaded_images/${imageInfo.category}/objects/${this.imageName}`;
+  
+        this.modalImageName = this.imageName;
       },
       error: (err) => {
         console.error('Error fetching image by name:', err);
@@ -77,7 +123,130 @@ export class SimpleSearchComponent {
       },
     });
   }
+
+  getImageByNameBase(name: string): Observable<string> { 
+    console.log('Starting image search for: ', name);
   
+    return this.imageService.getImagesByName(name).pipe(
+      map((imageInfo) => {
+        console.log('Image search completed:', imageInfo); // Debugging log
+  
+        // Ensure imageInfo is an object and has the required properties
+        if (imageInfo && imageInfo.previewPath) {
+          let imagePath = imageInfo.previewPath;
+  
+          // Fix backslashes for URLs
+          imagePath = imagePath.replace(/\\/g, '/');
+  
+          // Extract relative path after "upload_folder/"
+          const relativePath = imagePath.split('upload_folder/')[1];
+  
+          // Construct the full image URL
+          const imageUrl = `http://localhost:3000/uploaded_images/${relativePath}`;
+          console.log('Constructed image URL:', imageUrl);
+  
+          return imageUrl;
+        } else {
+          console.error('Image info does not have previewPath');
+          return ''; // Return an empty string if there's an issue
+        }
+      }),
+      catchError((err) => {
+        console.error('Error fetching image info:', err);
+        return of(''); // Return an empty string in case of error
+      })
+    );
+  }
+  
+
+  
+
+  search_3d(objectPath: string, K: number = 5): void {
+    console.log('Starting 3D search with objectPath:', objectPath, 'and K:', K);
+    this.isLoading = true;
+  
+    console.log('Attempting to fetch file from URL:', objectPath);
+    fetch(objectPath)
+      .then((response) => {
+        console.log('Received response from fetch:', response);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch file: ${response.statusText}`);
+        }
+        return response.blob();
+      })
+      .then((blob) => {
+        console.log('Fetched file as Blob:', blob);
+  
+        const file = new File([blob], 'model.obj', { type: blob.type });
+        console.log('Created File object:', file);
+  
+        const formData = new FormData();
+        formData.append('model', file, file.name);
+        formData.append('n_results', K.toString());
+  
+        console.log('Sending file to backend API...');
+  
+        this.http.post<any>('http://localhost:5000/search_3d_model', formData).subscribe({
+          next: (response: any) => {
+            console.log('Search results received:', response);
+  
+            const imageRequests = response.results.map((result: any) => {
+              console.log('wtf');
+  
+              const imagePath = result.thumbnail_path;
+              console.log(imagePath);
+  
+              // Normalize backslashes to forward slashes
+              const normalizedPath = imagePath.replace(/\\/g, '/');
+  
+              // Extract the last part of the path (file name)
+              const fileNameWithExt = normalizedPath.split('/').pop() || '';
+  
+              // Ensure the file name has ".jpg"
+              const finalName = fileNameWithExt.split('.')[0] + '.jpg';
+  
+              console.log("about to search image name", finalName);
+  
+              // Return an observable that fetches the image URL
+              return this.getImageByNameBase(finalName).pipe(
+                map((imageUrl) => ({
+                  thumbnail_path: imageUrl,  // Store the correct image URL here
+                  similarity: result.similarity,
+                  category: result.category
+                }))
+              );
+            });
+  
+            forkJoin<any[]>(imageRequests).subscribe({
+              next: (updatedResults) => {
+                this.similarImages = updatedResults;
+                console.log('Formatted similar images:', this.similarImages);
+              },
+              error: (err) => {
+                console.error('Error fetching image URLs:', err);
+              },
+              complete: () => {
+                this.isLoading = false;
+              }
+            });
+            
+            
+          },
+          error: (err) => {
+            console.error('Error during 3D search:', err);
+            this.isLoading = false;
+          }
+        });
+      })
+      .catch((err) => {
+        console.error('Error in fetch or processing file:', err);
+        this.isLoading = false;
+      });
+  }
+  
+  
+  
+
 
   getImageByName2(name: string): Observable<any> {
     console.log('Starting image search...');
@@ -156,10 +325,15 @@ extractFeatures(): void {
   });
 }
 
-  extractImageName(imagePath: string): string {
-    const pathParts = imagePath.split('\\'); // Split the path by backslashes
-    return pathParts[pathParts.length - 1]; // Return the last part (the name)
-  }
+extractImageName(imagePath: string): string {
+  const pathParts = imagePath.split('/'); // Split the URL by forward slashes
+  const fileName = pathParts[pathParts.length - 1]; // Get the last part (the name with extension)
+  const finalName= fileName.split('.')[0]; // Remove the extension by splitting by dot and taking the first part
+  //console.log(finalName)
+  return finalName
+}
+
+
 
   toggleSelection(image: any): void {
     image.isSelected = !image.isSelected;
