@@ -9,18 +9,19 @@ import { BaseChartDirective } from 'ng2-charts';
 import { ObjectViewerComponent } from "../../shared/components/object-viewer/object-viewer.component";
 import { HttpClient } from '@angular/common/http';
 import { forkJoin } from 'rxjs';
+import { DescriptorVisualizationComponent } from "../../shared/components/descriptor-visualization/descriptor-visualization.component";
 
 
 @Component({
   selector: 'app-simple-search',
   standalone: true,
-  imports: [FormsModule, CommonModule, RemoveFirstLetterPipe, ObjectViewerComponent],
+  imports: [FormsModule, CommonModule, RemoveFirstLetterPipe, ObjectViewerComponent, DescriptorVisualizationComponent],
   templateUrl: './simple-search.component.html',
   styleUrls: ['./simple-search.component.css'],
 })
 export class SimpleSearchComponent {
   imageCategory!: string;
-  numberK!: number;
+  //numberK!: number;
   imageName: string = '';
   imageUrl: string | null = null;
   similarImages: any[] = [];
@@ -44,9 +45,15 @@ export class SimpleSearchComponent {
   enableComparativeSearch: boolean = false; 
 
 
+  fourierDescriptors: number[] = [];
+  zernikeDescriptors: number[] = [];
+
+  numberK: number = 10; // default value
+  selectedReductionMethod: string = 'vertex_clustering'; // default reduction method
+
+
   constructor(private imageService: ImageServiceService, private http: HttpClient) {}
 
-  
   openModal(image: any): void {
     this.modalImageName = image.name;
   
@@ -160,9 +167,6 @@ export class SimpleSearchComponent {
       })
     );
   }
-  
-
-  
 
   search_3d(objectPath: string, K: number = 5): void {
     console.log('Starting 3D search with objectPath:', objectPath, 'and K:', K);
@@ -193,11 +197,36 @@ export class SimpleSearchComponent {
           next: (response: any) => {
             console.log('Search results received:', response);
   
-            const imageRequests = response.results.map((result: any) => {
-              console.log('wtf');
+            // Only log the body of the response containing the relevant data (not the entire headers, etc.)
+            const body = response.results || [];  // Assuming the body with results is in the "results" property
+            console.log('Descriptors and search results:', body);
+
+            console.log('Fourier Descriptors:', {
+              length: response.query_descriptors.fourier.length,
+              first5: response.query_descriptors.fourier.slice(0, 5),
+              min: Math.min(...response.query_descriptors.fourier),
+              max: Math.max(...response.query_descriptors.fourier)
+            });
+        
+            console.log('Zernike Descriptors:', {
+              length: response.query_descriptors.zernike.length,
+              first5: response.query_descriptors.zernike.slice(0, 5),
+              min: Math.min(...response.query_descriptors.zernike),
+              max: Math.max(...response.query_descriptors.zernike)
+            });
+
+            
+            if (response.query_descriptors) {
+              this.fourierDescriptors = response.query_descriptors.fourier;
+              this.zernikeDescriptors = response.query_descriptors.zernike;
+            }
+  
+            // Process the image requests based on the body of the response
+            const imageRequests = body.map((result: any) => {
+              console.log('Processing result:', result);
   
               const imagePath = result.thumbnail_path;
-              console.log(imagePath);
+              console.log('Thumbnail path:', imagePath);
   
               // Normalize backslashes to forward slashes
               const normalizedPath = imagePath.replace(/\\/g, '/');
@@ -208,7 +237,7 @@ export class SimpleSearchComponent {
               // Ensure the file name has ".jpg"
               const finalName = fileNameWithExt.split('.')[0] + '.jpg';
   
-              console.log("about to search image name", finalName);
+              console.log("About to search image name:", finalName);
   
               // Return an observable that fetches the image URL
               return this.getImageByNameBase(finalName).pipe(
@@ -224,7 +253,7 @@ export class SimpleSearchComponent {
               next: (updatedResults) => {
                 this.similarImages = updatedResults;
                 console.log('Formatted similar images:', this.similarImages);
-
+  
                 // Enable comparative search after normal search is done
                 this.enableComparativeSearch = true;  
               },
@@ -235,8 +264,7 @@ export class SimpleSearchComponent {
                 this.isLoading = false;
               }
             });
-            
-            
+  
           },
           error: (err) => {
             console.error('Error during 3D search:', err);
@@ -250,14 +278,11 @@ export class SimpleSearchComponent {
       });
   }
   
-  comparative_3d_search(objectPath: string, K: number = 5): void {
+
+  comparative_3d_search(objectPath: string, K: number = 5, reductionMethod: string = 'vertex_clustering'): void {
     console.log('Starting independent 3D comparative search with objectPath:', objectPath);
   
     this.isLoading = true;
-
-    // Normalize object path
-    //const normalizedObjectPath = `http://localhost:3000/${objectPath.replace(/\\/g, '/')}`;
-    //console.log('Resolved object path:', normalizedObjectPath);
 
     // Fetch the object file
     fetch(objectPath)
@@ -270,8 +295,9 @@ export class SimpleSearchComponent {
         const formData = new FormData();
         formData.append('model', file, file.name);
         formData.append('n_results', K.toString());
+        formData.append('reduction_method', reductionMethod);  // **Added this line**
 
-        console.log('Sending 3D model to backend for comparison...');
+        console.log('Sending 3D model to backend for comparison with reduction method:', reductionMethod);
 
         // Call the backend API
         this.http.post<any>('http://localhost:5000/search_3d_model', formData).subscribe({
@@ -329,11 +355,6 @@ export class SimpleSearchComponent {
         this.isLoading = false;
       });
 }
-
-  
-  
-  
-
 
   getImageByName2(name: string): Observable<any> {
     console.log('Starting image search...');
